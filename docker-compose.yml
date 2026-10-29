@@ -1,0 +1,113 @@
+# ============================================================
+# AI Todo · 生产部署（PostgreSQL 版）
+#
+#   docker compose up -d --build
+#   浏览器打开 http://localhost:8787
+#
+# 想要零外部依赖的单容器版（内置 PGlite）：
+#   docker compose -f docker-compose.pglite.yml up -d --build
+#
+# 变量都可以放在同目录的 .env 里（照抄 .env.example 即可）。
+# ============================================================
+
+name: ai-todo
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-todo:latest
+    container_name: ai-todo
+    restart: unless-stopped
+    # init: true 让 tini 做 PID 1，容器停止时 SIGTERM 能正确送到 Node，
+    # 服务端注册的 shutdown 钩子（停调度器 → 关连接）才会跑完。
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 必须监听 0.0.0.0，容器外才访问得到
+      AI_TODO_HOST: "0.0.0.0"
+      AI_TODO_PORT: "8787"
+      AI_TODO_DATA_DIR: "/app/data"
+      AI_TODO_WEB_DIR: "/app/web"
+      # 通知里的深链接用它。局域网其它机器访问时要改成实际地址，
+      # 例如 http://192.168.1.20:8787
+      AI_TODO_BASE_URL: "${AI_TODO_PUBLIC_URL:-http://localhost:8787}"
+      AI_TODO_LOG_LEVEL: "${AI_TODO_LOG_LEVEL:-info}"
+      AI_TODO_SESSION_TTL_DAYS: "${AI_TODO_SESSION_TTL_DAYS:-30}"
+      # 走真正的 PostgreSQL。密码只用字母数字与下划线——
+      # 这个值要拼进连接 URL，含 @ : / # 会破坏 URL 解析。
+      DATABASE_URL: "postgres://${POSTGRES_USER:-ai_todo}:${POSTGRES_PASSWORD:-ai_todo}@postgres:5432/${POSTGRES_DB:-ai_todo}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      # 管理员凭据文件等落在这里
+      - ai-todo-data:/app/data
+    ports:
+      - "${AI_TODO_BIND:-8787}:8787"
+    healthcheck:
+      # 镜像里没有 curl，用 node 自带的 fetch 探活
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      # 首次启动要建表 + 创建管理员账号，给足时间
+      start_period: 20s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-todo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-ai_todo}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-ai_todo}"
+      POSTGRES_DB: "${POSTGRES_DB:-ai_todo}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - ai-todo-pg:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ${POSTGRES_USER:-ai_todo} -d ${POSTGRES_DB:-ai_todo}"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # 不对外暴露端口：只有 app 容器需要访问它
+    expose:
+      - "5432"
+
+  # ------------------------------------------------------------
+  # 可选：容器内跑 MCP Server（stdio）。
+  #   docker compose run --rm mcp
+  # 平时 `docker compose up` 不会启动它（profile 没激活）。
+  #
+  # 注意：绝大多数 AI 客户端（Claude Code / Cursor 等）更愿意在
+  # 你本机直接跑 MCP，让它连已暴露的 8787 端口即可 —— 见 docs/deployment.md。
+  # ------------------------------------------------------------
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-todo:latest
+    profiles: ["mcp"]
+    init: true
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # 没有令牌 MCP 会拒绝启动并打印提示——这是刻意的：凭据只走环境变量
+      AI_TODO_TOKEN: "${AI_TODO_TOKEN:-}"
+      AI_TODO_BASE_URL: "http://app:8787"
+      AI_TODO_SESSION_KEY: "${AI_TODO_SESSION_KEY:-docker-mcp}"
+      AI_TODO_AGENT: "${AI_TODO_AGENT:-docker-mcp}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    command: ["node", "dist/src/cli.js", "mcp"]
+
+volumes:
+  ai-todo-data:
+  ai-todo-pg:

@@ -1,0 +1,20 @@
+# 依赖与构建产物
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 运行时数据：PGlite 数据库、管理员凭据、令牌、日志
+data/
+
+# 环境变量与本地机密
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

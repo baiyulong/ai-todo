@@ -1,0 +1,76 @@
+# ============================================================
+# AI Todo · 轻量部署（内置 PGlite，无需 PostgreSQL）
+#
+#   docker compose -f docker-compose.pglite.yml up -d --build
+#   浏览器打开 http://localhost:8787
+#
+# 与 docker-compose.yml 的差别只有一处：不连外部数据库。
+# 数据落在命名卷 ai-todo-data 的 pgdata 目录里，容器删了数据还在。
+#
+# 什么时候用这个：
+#   ✓ 只想自己用、任务量不大 —— 少一个容器，零外部依赖
+#   ✗ 多人高频并发 —— PGlite 是单连接实现，所有查询串行执行
+#
+# 什么时候用生产版：
+#   ✓ 多人使用、并发写入多、想要 pg_dump 备份
+# ============================================================
+
+name: ai-todo
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-todo:latest
+    container_name: ai-todo
+    restart: unless-stopped
+    init: true
+    environment:
+      AI_TODO_HOST: "0.0.0.0"
+      AI_TODO_PORT: "8787"
+      AI_TODO_DATA_DIR: "/app/data"
+      AI_TODO_WEB_DIR: "/app/web"
+      AI_TODO_BASE_URL: "${AI_TODO_PUBLIC_URL:-http://localhost:8787}"
+      AI_TODO_LOG_LEVEL: "${AI_TODO_LOG_LEVEL:-info}"
+      AI_TODO_SESSION_TTL_DAYS: "${AI_TODO_SESSION_TTL_DAYS:-30}"
+      # 留空 = 用内置 PGlite，数据库文件在 /app/data/pgdata
+      DATABASE_URL: ""
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - ai-todo-data:/app/data
+    ports:
+      - "${AI_TODO_BIND:-8787}:8787"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # 可选：容器内跑 MCP Server（stdio）
+  #   docker compose -f docker-compose.pglite.yml run --rm mcp
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-todo:latest
+    profiles: ["mcp"]
+    init: true
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      AI_TODO_TOKEN: "${AI_TODO_TOKEN:-}"
+      AI_TODO_BASE_URL: "http://app:8787"
+      AI_TODO_SESSION_KEY: "${AI_TODO_SESSION_KEY:-docker-mcp}"
+      AI_TODO_AGENT: "${AI_TODO_AGENT:-docker-mcp}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    command: ["node", "dist/src/cli.js", "mcp"]
+
+volumes:
+  ai-todo-data:

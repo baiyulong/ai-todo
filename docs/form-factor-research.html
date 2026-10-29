@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 完成任务自动推送到 Todo —— 形态选型调研</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f5f0;
+  --card:#ffffff;
+  --line:#e9e3d6;
+  --line-soft:#f0ebe0;
+  --ink:#14171e;
+  --ink-2:#3a4256;
+  --muted:#7c7a72;
+  --primary:#2f6f5e;
+  --primary-soft:rgba(47,111,94,.08);
+  --warn:#c97b3f;
+  --warn-soft:rgba(201,123,63,.10);
+  --danger:#b06367;
+  --danger-soft:rgba(176,99,103,.10);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink-2);
+  font-family:'Outfit',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+body::before,body::after{
+  content:"";position:fixed;width:520px;height:520px;border-radius:50%;
+  pointer-events:none;z-index:0;
+}
+body::before{top:-260px;right:-180px;background:radial-gradient(circle,rgba(47,111,94,.07),transparent 70%)}
+body::after{bottom:-300px;left:-200px;background:radial-gradient(circle,rgba(201,123,63,.06),transparent 70%)}
+.wrap{position:relative;z-index:1;max-width:1020px;margin:0 auto;padding:56px 24px 80px}
+@media (min-width:768px){.wrap{padding:72px 40px 110px}}
+
+h1,h2,h3{margin:0;font-family:'DM Serif Display','Songti SC',Georgia,serif;font-weight:400;color:var(--ink);letter-spacing:-.005em}
+h1{font-size:32px;line-height:1.28}
+h2{font-size:23px;line-height:1.35}
+h3{font-size:16px;font-family:'Outfit',sans-serif;font-weight:600}
+p{margin:0 0 10px}
+a{color:var(--primary)}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--primary);font-weight:600;margin-bottom:18px;
+}
+.eyebrow::before{content:"";width:22px;height:2px;background:var(--primary);opacity:.6}
+
+section{margin-top:48px}
+.sec-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.sec-head .ico{flex:0 0 auto;width:20px;height:20px;color:var(--primary);margin-top:5px}
+.sec-head .sub{display:block;font-family:'Outfit',sans-serif;font-size:14px;color:var(--muted);margin-top:4px;max-width:760px}
+
+.lead{font-size:16.5px;color:var(--ink-2);max-width:800px;margin-top:16px}
+
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.035);
+}
+.card + .card{margin-top:12px}
+
+.verdict{
+  background:linear-gradient(0deg,rgba(47,111,94,.045),rgba(47,111,94,.045)),#fff;
+  border:1px solid #d8e5e0;border-radius:18px;padding:24px;margin-top:26px;
+  box-shadow:0 4px 16px -2px rgba(47,111,94,.10);
+}
+.verdict .tag{
+  display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.12em;color:#fff;
+  background:var(--primary);padding:4px 10px;border-radius:6px;margin-bottom:12px;
+}
+.verdict p.big{font-size:17px;line-height:1.62;color:var(--ink);margin:0 0 14px}
+.verdict ul{margin:0;padding-left:18px}
+.verdict li{margin-bottom:7px;font-size:14.5px}
+.verdict li::marker{color:var(--primary)}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.note{
+  font-size:13.5px;color:var(--muted);background:var(--primary-soft);
+  border-left:3px solid var(--primary);border-radius:0 10px 10px 0;padding:11px 15px;margin-top:14px;
+}
+.note.warn{background:var(--warn-soft);border-left-color:var(--warn)}
+.note.danger{background:var(--danger-soft);border-left-color:var(--danger)}
+
+table{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+th,td{padding:11px 13px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top}
+th{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:#fbfaf6;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.strong{color:var(--ink);font-weight:600}
+td.muted{color:var(--muted);font-size:13.5px}
+.mark{font-size:13px;letter-spacing:.06em;color:var(--primary)}
+.mark.mid{color:var(--warn)}
+.mark.low{color:var(--danger);opacity:.75}
+.rec-pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:var(--primary-soft);color:var(--primary)}
+.rec-pill.no{background:var(--line-soft);color:var(--muted)}
+.rec-pill.mid{background:var(--warn-soft);color:var(--warn)}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:14px}
+.table-scroll table{min-width:660px}
+table.t-wide th:last-child,table.t-wide td:last-child{width:31%}
+table.t-wide th:nth-child(2),table.t-wide td:nth-child(2){width:13%}
+table.t-wide th:nth-child(3),table.t-wide td:nth-child(3){width:9%}
+
+.bench{display:grid;grid-template-columns:150px 1fr 74px;gap:12px;align-items:center;padding:6px 0;font-size:13.5px}
+.bench-track{height:14px;background:var(--line-soft);border-radius:5px;overflow:hidden}
+.bench-fill{height:100%;background:var(--primary);border-radius:5px}
+.bench-fill.w{background:var(--warn)}
+.bench-fill.d{background:var(--danger);opacity:.6}
+.bench-val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+@media (max-width:560px){.bench{grid-template-columns:108px 1fr 62px;gap:9px;font-size:12.5px}}
+
+.timeline{list-style:none;padding:0;margin:0;position:relative}
+.timeline::before{content:"";position:absolute;left:7px;top:8px;bottom:10px;width:2px;background:var(--primary);opacity:.3}
+.timeline li{position:relative;padding:0 0 20px 30px}
+.timeline li:last-child{padding-bottom:0}
+.timeline li::before{content:"";position:absolute;left:0;top:5px;width:15px;height:15px;border-radius:50%;background:var(--bg);border:2px solid var(--primary)}
+.timeline li.risk::before{border-color:var(--warn)}
+.timeline li strong{display:block;color:var(--ink);font-size:15px;font-weight:600;margin-bottom:2px}
+.timeline li p{margin:0;font-size:14px;color:var(--ink-2)}
+.timeline li .fix{display:inline-block;margin-top:6px;font-size:13px;color:var(--primary);background:var(--primary-soft);padding:3px 9px;border-radius:6px}
+
+.diagram{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 14px;box-shadow:0 2px 8px rgba(0,0,0,.035)}
+.diagram svg{display:block;width:100%;height:auto}
+.d-box{fill:#fff;stroke:#ded5c2;stroke-width:1.4}
+.d-box.alt{fill:#fbfaf6;stroke:#d5cbb6}
+.d-box.dash{stroke:#d5cbb6;stroke-dasharray:5 4}
+.d-box.core{fill:#f2f7f5;stroke:var(--primary);stroke-width:1.8}
+.d-title{font-family:'Outfit',sans-serif;font-size:15px;font-weight:600;fill:var(--ink)}
+.d-sub{font-family:'Outfit',sans-serif;font-size:12.5px;fill:var(--muted)}
+.d-t{font-family:'Outfit',sans-serif;font-size:11.5px;fill:var(--primary);font-weight:600;letter-spacing:.08em}
+.d-line{stroke:var(--primary);stroke-width:1.7;fill:none}
+.d-line.dash{stroke:#c3b79e;stroke-dasharray:5 4}
+.d-note{font-family:'Outfit',sans-serif;font-size:12.5px;fill:#8a8578}
+
+.kv{display:grid;grid-template-columns:104px 1fr;row-gap:8px;column-gap:14px;margin:0;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;color:var(--ink);font-weight:500}
+
+pre{
+  margin:0;background:#1c1f26;color:#e7e4dc;border-radius:12px;padding:16px 18px;
+  font-family:'JetBrains Mono',ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.75;overflow-x:auto;
+}
+pre .k{color:#8fd0b8}
+pre .c{color:#7f8894}
+pre .s{color:#e0b07a}
+
+.pill-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.pill{font-size:12.5px;padding:4px 11px;border-radius:20px;background:#fff;border:1px solid var(--line);color:var(--ink-2)}
+.pill.on{background:var(--primary-soft);border-color:#cfe0da;color:var(--primary);font-weight:600}
+
+.src{font-size:12.5px;color:var(--muted);margin-top:10px}
+.src a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+@media (max-width:640px){
+  h1{font-size:26px}h2{font-size:20px}
+  .wrap{padding:36px 18px 60px}
+  section{margin-top:38px}
+  th,td{padding:9px 10px;font-size:13px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">形态选型调研 · 2026-10</div>
+    <h1>AI 干完活主动推给你：<br>该做成 Web、桌面 App，还是原生 App？</h1>
+    <p class="lead">目标很明确——AI 通过 MCP 把已完成的任务推进 Todo，并<b>可靠地</b>提醒到你，让你及时接手剩下的部分。所以真正的决策点不是"UI 长什么样"，而是两件被混在一起的事：<b>AI 怎么连上任务库</b>，以及<b>通知怎么真的送到你手机和桌面</b>。</p>
+
+    <div class="verdict">
+      <span class="tag">推荐结论</span>
+      <p class="big">用 <b>响应式 Web + PWA</b> 做唯一一套前端，桌面端靠"安装为应用"、手机端靠"添加到主屏幕"；<b>不要</b>单独做 Electron/Tauri 壳，<b>不要</b>先做原生 App。<br>但必须额外补两个非 UI 组件：<b>本地 MCP Server</b> 与 <b>多通道可插拔通知层</b>。</p>
+      <ul>
+        <li><b>一套代码覆盖三端</b>：桌面浏览器、桌面安装的 PWA（独立窗口 + 通知中心）、手机主屏 PWA（角标 + 推送）。</li>
+        <li><b>桌面壳的真正价值不是 UI，是打包</b>：它能把「MCP Server + 本地库 + 系统通知」封成一个安装包。想要这个，用 Tauri（不打包 Chromium），不用 Electron。</li>
+        <li><b>通知层才是成败关键</b>：国内 Android 的 Web Push 走 FCM，<b>不通</b>；iOS 的 Web Push 走 Apple 通道，<b>可用</b>。所以通道必须能插拔，不能只有一条。</li>
+        <li><b>自建 vs 现成</b>：如果只想要"AI 完成后提醒"，Todoist / Taskade 已有官方 MCP + 推送，半天搞定；自建的真正价值在本地自持、与 AI 会话产物深度关联、通知通道可控。</li>
+      </ul>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 3-3 3 3 5-6"/></svg>
+      <div><h2>一、四种形态放在一起比</h2>
+        <span class="sub">同一套需求：AI 推送任务 + 主动提醒 + 手机可用 + 自己掌控数据。</span></div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>形态</th><th>三端覆盖</th><th>通知必达性<br><span style="font-weight:400;text-transform:none">（国内环境）</span></th>
+            <th>上手成本</th><th>长期维护</th><th>数据自持</th><th>结论</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="strong">响应式 Web + PWA<br><span class="muted" style="font-weight:400">桌面/手机同一套代码</span></td>
+            <td><span class="mark">●●●</span></td>
+            <td><span class="mark mid">◐◐○</span><br><span class="muted">靠外部通道补齐</span></td>
+            <td class="muted">低</td><td class="muted">低</td>
+            <td><span class="mark">●●●</span></td>
+            <td><span class="rec-pill">首选</span></td>
+          </tr>
+          <tr>
+            <td class="strong">Web + Tauri 桌面壳<br><span class="muted" style="font-weight:400">Electron 同理但更重</span></td>
+            <td><span class="mark">●●○</span></td>
+            <td><span class="mark">●●●</span><br><span class="muted">桌面端可直发系统通知</span></td>
+            <td class="muted">中</td><td class="muted">中</td>
+            <td><span class="mark">●●●</span></td>
+            <td><span class="rec-pill mid">按需打包</span></td>
+          </tr>
+          <tr>
+            <td class="strong">原生 App<br><span class="muted" style="font-weight:400">RN / Flutter + iOS/Android</span></td>
+            <td><span class="mark">●●●</span></td>
+            <td><span class="mark">●●●</span><br><span class="muted">APNs / 厂商通道</span></td>
+            <td class="muted">高</td><td class="muted">高</td>
+            <td><span class="mark">●●●</span></td>
+            <td><span class="rec-pill mid">必要时才上</span></td>
+          </tr>
+          <tr>
+            <td class="strong">现成 SaaS + 官方 MCP<br><span class="muted" style="font-weight:400">Todoist / Taskade / Plane</span></td>
+            <td><span class="mark">●●●</span></td>
+            <td><span class="mark">●●●</span></td>
+            <td class="muted">极低</td><td class="muted">极低</td>
+            <td><span class="mark low">○○●</span></td>
+            <td><span class="rec-pill no">先评估</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:14px">
+      <div class="bench"><span class="bench-label">响应式 Web + PWA</span><div class="bench-track"><div class="bench-fill" style="width:14%"></div></div><span class="bench-val">≈1–3 天</span></div>
+      <div class="bench"><span class="bench-label">Web + Tauri 壳</span><div class="bench-track"><div class="bench-fill" style="width:30%"></div></div><span class="bench-val">≈+2–4 天</span></div>
+      <div class="bench"><span class="bench-label">原生 App 双端</span><div class="bench-track"><div class="bench-fill d" style="width:92%"></div></div><span class="bench-val">≈+15–25 天</span></div>
+      <div class="bench"><span class="bench-label">接现成 SaaS</span><div class="bench-track"><div class="bench-fill" style="width:6%"></div></div><span class="bench-val">≈0.5 天</span></div>
+    </div>
+    <p class="src">工时为单人自研的粗略量级估算（不含账户体系、推送运维与多端联调）。</p>
+
+    <div class="note danger"><b>关键提醒：</b>选 Web/PWA 的唯一硬伤是「手机推送的必达性」，而不是「Web 能不能做 todo」。通知层做对了，PWA 形态就成立；通知层没做对，做成什么形态你都收不到提醒。</div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <div><h2>二、推荐架构</h2>
+        <span class="sub">两个进程、一份 SQLite、零同步逻辑。AI 写库与你看列表天然一致。</span></div>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 980 378" role="img" aria-label="架构图：AI 客户端通过 MCP Server 写入本地 SQLite，ai-todo-daemon 读取同一份库并对外提供 Web UI 与多通道通知">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#2f6f5e"/>
+          </marker>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#b9ab8e"/>
+          </marker>
+        </defs>
+
+        <!-- lane 1 -->
+        <rect class="d-box alt" x="8" y="26" width="200" height="56" rx="11"/>
+        <text class="d-title" x="20" y="49">AI 客户端</text>
+        <text class="d-sub" x="20" y="68">MCode / Claude Code / Cursor</text>
+
+        <path class="d-line" d="M108 82 L108 112" marker-end="url(#ah)"/>
+        <text class="d-note" x="116" y="104">spawn</text>
+
+        <rect class="d-box core" x="8" y="122" width="200" height="62" rx="11"/>
+        <text class="d-t" x="20" y="142">MCP SERVER</text>
+        <text class="d-title" x="20" y="161">stdio · 每次会话 spawn</text>
+        <text class="d-sub" x="20" y="177">写入即触发通知</text>
+
+        <path class="d-line" d="M108 184 L108 218" marker-end="url(#ah)"/>
+        <text class="d-note" x="116" y="207">写入</text>
+
+        <rect class="d-box" x="8" y="228" width="200" height="58" rx="11"/>
+        <text class="d-title" x="20" y="251">SQLite · tasks 表</text>
+        <text class="d-sub" x="20" y="270">唯一数据源，无需同步</text>
+
+        <!-- daemon -->
+        <rect class="d-box core" x="266" y="26" width="212" height="158" rx="13"/>
+        <text class="d-t" x="284" y="50">LOCAL DAEMON</text>
+        <text class="d-title" x="284" y="72">ai-todo-daemon</text>
+        <text class="d-sub" x="284" y="95">REST API + 响应式 Web UI</text>
+        <text class="d-sub" x="284" y="114">监听 0.0.0.0:8787</text>
+        <text class="d-sub" x="284" y="133">Notifier 适配层</text>
+        <text class="d-sub" x="284" y="152">任务聚合 / 去重 / 冷却</text>
+
+        <path class="d-line" d="M208 153 L256 153" marker-end="url(#ah)"/>
+        <text class="d-note" x="212" y="146">HTTP</text>
+
+        <path class="d-line" d="M300 184 L218 255" marker-end="url(#ah)"/>
+        <text class="d-note" x="226" y="230">读取</text>
+
+        <!-- web ui -->
+        <rect class="d-box" x="536" y="26" width="196" height="62" rx="11"/>
+        <text class="d-title" x="554" y="49">响应式 Web UI</text>
+        <text class="d-sub" x="554" y="67">桌面浏览器 / 桌面 PWA</text>
+        <text class="d-sub" x="554" y="81" style="font-size:11.5px">手机主屏 PWA（角标 + 推送）</text>
+        <path class="d-line" d="M478 57 L526 57" marker-end="url(#ah)"/>
+
+        <!-- notifier -->
+        <rect class="d-box" x="536" y="122" width="196" height="62" rx="11"/>
+        <text class="d-title" x="554" y="146">Notifier 适配层</text>
+        <text class="d-sub" x="554" y="164">统一 notify(event) 接口</text>
+        <text class="d-sub" x="554" y="178" style="font-size:11.5px">多通道并行，互为备份</text>
+        <path class="d-line" d="M478 153 L526 153" marker-end="url(#ah)"/>
+
+        <!-- bus -->
+        <path class="d-line" d="M732 153 L762 153 L762 54 L772 54" marker-end="url(#ah)"/>
+        <path class="d-line" d="M762 153 L772 114" marker-end="url(#ah)"/>
+        <path class="d-line" d="M762 153 L772 174" marker-end="url(#ah)"/>
+        <path class="d-line" d="M762 153 L772 234" marker-end="url(#ah)"/>
+
+        <!-- channels -->
+        <rect class="d-box" x="778" y="30" width="192" height="48" rx="10"/>
+        <text class="d-title" x="792" y="50" style="font-size:14px">Windows 原生通知</text>
+        <text class="d-sub" x="792" y="66" style="font-size:11.5px">本地直发，不走推送通道</text>
+
+        <rect class="d-box" x="778" y="90" width="192" height="48" rx="10"/>
+        <text class="d-title" x="792" y="110" style="font-size:14px">Bark（iOS）</text>
+        <text class="d-sub" x="792" y="126" style="font-size:11.5px">可自建，HTTP 一行</text>
+
+        <rect class="d-box" x="778" y="150" width="192" height="48" rx="10"/>
+        <text class="d-title" x="792" y="170" style="font-size:14px">飞书 / 钉钉 / 企微机器人</text>
+        <text class="d-sub" x="792" y="186" style="font-size:11.5px">WebHook，国内最稳</text>
+
+        <rect class="d-box" x="778" y="210" width="192" height="48" rx="10"/>
+        <text class="d-title" x="792" y="230" style="font-size:14px">iOS Web Push（VAPID）</text>
+        <text class="d-sub" x="792" y="246" style="font-size:11.5px">走 Apple 通道，国内可用</text>
+
+        <!-- remote access note -->
+        <path class="d-line dash" d="M372 184 L372 296" marker-end="url(#ah2)"/>
+        <text class="d-note" x="382" y="246">可选：对外暴露</text>
+        <rect class="d-box alt dash" x="8" y="306" width="962" height="54" rx="11"/>
+        <text class="d-title" x="26" y="329" style="font-size:14px">可选：Cloudflare Tunnel / Tailscale 暴露到公网</text>
+        <text class="d-sub" x="26" y="348">手机在任意网络下访问同一套 UI，无需引入云端数据库；数据仍留在本机。</text>
+      </svg>
+    </div>
+
+    <div class="note" style="margin-top:16px">
+      <b>MCP 传输选型：</b>v1 用 <b>stdio</b>（本地子进程，客户端一行 <code style="font-family:'JetBrains Mono',monospace;font-size:12.5px">npx</code> 配置，凭据走环境变量，日志走 stderr、stdout 严格留给协议）。等你要「任意 AI 客户端填个 URL 就能远程接入」时，再把同一个服务额外暴露成 <b>Streamable HTTP</b>——按 2026-07-28 规范它已是<b>无状态</b>（不再有 <code style="font-family:'JetBrains Mono',monospace;font-size:12.5px">Mcp-Session-Id</code>，改用 <code style="font-family:'JetBrains Mono',monospace;font-size:12.5px">Mcp-Method</code> / <code style="font-family:'JetBrains Mono',monospace;font-size:12.5px">Mcp-Name</code> 路由头 + <code style="font-family:'JetBrains Mono',monospace;font-size:12.5px">_meta</code> 携带协议版本），鉴权走 OAuth 2.1 Bearer。老的 HTTP+SSE 传输已在 2025-03-26 废弃，不要新建。
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
+      <div class="card">
+        <h3>数据模型</h3>
+        <pre style="margin-top:10px"><span class="c">-- 单一数据源</span>
+<span class="k">tasks</span>(
+  id, title, detail,
+  status,      <span class="c">-- pending/acked/done</span>
+  severity,    <span class="c">-- info/need_human/blocker</span>
+  source_session, source_agent,
+  idempotency_key <span class="k">UNIQUE</span>, <span class="c">-- 防重复推送</span>
+  links, created_at, acked_at
+)</pre>
+      </div>
+      <div class="card">
+        <h3>暴露给 AI 的 MCP 工具</h3>
+        <pre style="margin-top:10px"><span class="k">todo_add</span>(title, detail,
+  severity, notify,
+  links, idempotency_key)
+
+<span class="k">todo_list</span>(status?, severity?)
+<span class="k">todo_ack</span>(id)   <span class="c">-- 我已接手</span>
+<span class="k">todo_update</span>(id, ...)
+<span class="k">todo_done</span>(id)</pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <div><h2>三、通知通道：决定你到底收不收得到</h2>
+        <span class="sub">这是整个方案里最容易被低估的一环。国内环境下，Web Push 只在 iOS 上靠得住。</span></div>
+    </div>
+
+    <div class="table-scroll">
+      <table class="t-wide">
+        <thead>
+          <tr><th>通道</th><th>消息落在哪</th><th>国内可用</th><th>要装 App</th><th>成本</th><th>实现成本</th><th>备注</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="strong">Windows 原生通知</td><td>桌面右下角 Toast</td>
+            <td><span class="mark">●●●</span></td><td class="muted">否</td><td class="muted">0</td><td class="muted">极低</td>
+            <td class="muted">本地守护进程直接发，不依赖任何推送网关</td>
+          </tr>
+          <tr>
+            <td class="strong">Bark</td><td>iPhone 通知</td>
+            <td><span class="mark">●●●</span></td><td class="muted">iOS 端要</td><td class="muted">0 / 可自建</td><td class="muted">极低</td>
+            <td class="muted">HTTP 一行；App 内可开「重要提醒」穿透勿扰</td>
+          </tr>
+          <tr>
+            <td class="strong">飞书 / 钉钉 / 企微机器人</td><td>群消息</td>
+            <td><span class="mark">●●●</span></td><td class="muted">已有</td><td class="muted">0</td><td class="muted">极低</td>
+            <td class="muted">WebHook URL，国内可达性最好，落点是你每天会看的 App</td>
+          </tr>
+          <tr>
+            <td class="strong">Server酱 Turbo</td><td>微信服务号</td>
+            <td><span class="mark">●●●</span></td><td class="muted">否</td><td class="muted">0（免费 5 条/天）</td><td class="muted">极低</td>
+            <td class="muted">懒得装 App 时的兜底</td>
+          </tr>
+          <tr>
+            <td class="strong">iOS Web Push（VAPID）</td><td>主屏 PWA 通知</td>
+            <td><span class="mark">●●●</span></td><td class="muted">否</td><td class="muted">0</td><td class="muted">中</td>
+            <td class="muted">走 Apple 通道；需 iOS 16.4+ 且必须「添加到主屏幕」；Safari 单条载荷上限 2KB</td>
+          </tr>
+          <tr>
+            <td class="strong">Android Web Push</td><td>PWA 通知</td>
+            <td><span class="mark low">○○○</span></td><td class="muted">否</td><td class="muted">0</td><td class="muted">中</td>
+            <td class="muted">依赖 FCM，国内 Google 服务不可达 → 不可靠；海外正常</td>
+          </tr>
+          <tr>
+            <td class="strong">邮件 SMTP</td><td>邮箱</td>
+            <td><span class="mark">●●●</span></td><td class="muted">否</td><td class="muted">近 0</td><td class="muted">低</td>
+            <td class="muted">最终兜底，延迟高、不适合当主通道</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn" style="margin-top:14px">
+      <b>国内 Android 的硬约束：</b>Chrome 的 Web Push 走 FCM，而 FCM 依赖 Google 服务在国内不可达，因此 <b>Android + 国内 + 纯 Web Push ≈ 收不到</b>。要么走上面的 WebHook / Bark 通道，要么做原生 App 接厂商推送（小米/华为/OPPO/vivo/荣耀）——这也是「必须支持安卓且要求必达」时唯一该推翻 Web 优先结论的理由。
+    </div>
+
+    <div class="note" style="margin-top:10px">
+      <b>桌面端为什么要单独走原生通知：</b>桌面 Chrome 的 PWA 推送同样依赖 FCM，且关掉所有窗口后可能停止投递（Edge 开启 Startup Boost 后才稳定）。本地 daemon 直接发系统 Toast，零延迟、零依赖、离线可用——桌面场景没有理由用 Web Push。
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <div><h2>四、风险与对策</h2>
+        <span class="sub">按「一定会踩」的顺序排，不按可能性排。</span></div>
+    </div>
+    <ol class="timeline">
+      <li class="risk"><strong>通知漏达</strong><p>手机没装 PWA、没授权限、通道挂了、你人在飞机上——任一环节断了就收不到，而"漏达"恰好毁掉这个工具的全部价值。</p><span class="fix">对策：至少并行两条通道（WebHook 为主 + iOS Web Push 为辅）；daemon 侧保留 30 天未读列表，打开 App 必能看到，不依赖推送到达</span></li>
+      <li class="risk"><strong>通知噪音</strong><p>AI 每完成一个子步骤就推一条，一天几十条，很快全部静音——这是同类工具最常见的死法。</p><span class="fix">对策：severity 分级，只有 need_human / blocker 才推送；同一会话聚合为一条；5 分钟冷却；每日摘要兜底</span></li>
+      <li class="risk"><strong>重复推送</strong><p>AI 工具调用失败重试、用户重跑会话，同一件事被推两遍。</p><span class="fix">对策：idempotency_key = session_id + task_id 建唯一索引，重复写入直接返回已有记录</span></li>
+      <li class="risk"><strong>设备不在同一网络</strong><p>家里 WiFi 之外打开手机页面就是"无法连接"。</p><span class="fix">对策：Tunnel / Tailscale 暴露（推荐，仍是本地数据）；或引入云端中继只同步推送与快照</span></li>
+      <li class="risk"><strong>iOS 订阅失效</strong><p>系统重启后 service worker 的 push 监听可能不触发；浏览器还会定期轮换订阅对象。</p><span class="fix">对策：监听 pushsubscriptionchange 重新订阅、服务端把 404/410 视为退订并清理、定期校验订阅存活</span></li>
+      <li class="risk"><strong>任务内容外泄</strong><p>任务标题里常有内网地址、代码片段、客户名。</p><span class="fix">对策：数据留在本机 SQLite；外发内容只做脱敏摘要；载荷不含敏感正文（点开再拉详情）</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      <div><h2>五、落地路线</h2>
+        <span class="sub">先跑通「AI 推 → 我被提醒 → 我在手机上处理」这条主链路，再谈形态美化。</span></div>
+    </div>
+    <ol class="timeline">
+      <li><strong>v0 · 闭环验证（≈1 天）</strong><p>本地 daemon（Node）+ SQLite + 最小 REST + 一屏 Web UI + MCP stdio 三个工具（add/list/ack）+ 一个 WebHook 通道（飞书机器人或 Bark）。目标是<b>亲手感受一次</b>：AI 干活完，手机真的弹了。</p></li>
+      <li><strong>v1 · 成产品（≈2–3 天）</strong><p>响应式 PWA（manifest + service worker + 角标）+ Windows 原生通知 + Tunnel 暴露 + 噪声控制（severity / 聚合 / 冷却 / 幂等）+ 任务详情与来源链接回溯。</p></li>
+      <li><strong>v2 · 按需扩张</strong><p>远程 Streamable HTTP MCP（任意客户端连 URL）+ iOS Web Push(VAPID) + 多设备同步 + 可选的 Tauri 打包（把 daemon + MCP Server 装成一个 Windows 应用）。</p></li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><h2>六、什么时候应该推翻这个结论</h2>
+        <span class="sub">如果下面任一条命中，就不要按上面的路线走。</span></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>主力是安卓手机，且要求必达</h3>
+        <p class="muted" style="margin-top:8px">国内 FCM 不通，纯 Web Push 行不通。此时要么补 WebHook/Bark，要么上原生 App 接厂商推送通道。</p>
+      </div>
+      <div class="card">
+        <h3>要多人 / 团队共享</h3>
+        <p class="muted" style="margin-top:8px">这已经不是个人 todo 的问题。直接用 Todoist / Taskade / Plane 的官方 MCP，别自己造轮子。</p>
+      </div>
+      <div class="card">
+        <h3>必须离线 + 一键安装 + 数据自持</h3>
+        <p class="muted" style="margin-top:8px">那就加 Tauri 壳，但要清楚它打包的是「daemon + MCP Server + 本地库」，UI 仍复用 Web 那套。</p>
+      </div>
+      <div class="card">
+        <h3>只是想被提醒一下</h3>
+        <p class="muted" style="margin-top:8px">用现成的：Todoist / Taskade 有官方 MCP 和成熟推送，半天接入。自建的增量价值在「与 AI 会话、产物、来源深度关联」。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>调研口径</b>：MCP 传输规范依据 2026-07-28 版协议（stdio / Streamable HTTP，HTTP+SSE 已于 2025-03-26 废弃）；Web Push 能力依据 iOS 16.4+（Safari 18.4 Declarative Web Push、iOS 26 主屏站点默认独立窗口）与桌面 Chrome/Edge 行为；国内推送可用性依据 FCM 在中国大陆不可达的既有事实与国产通道现状。</p>
+    <p style="margin-top:8px">主要参考：MCP 传输规范与 SDK 现状、Web Push 生产实践（MobiLoud / web-push-notifications.com / SuprSend）、Windows PWA 通知行为（Chrome vs Edge）、国内推送服务选型对比（Server酱 / Bark / 群机器人）、Tauri 与 Electron 对比（DualMedia）、MCP Registry 中的 todo 类服务器现状。</p>
+  </footer>
+
+</div>
+</body>
+</html>
