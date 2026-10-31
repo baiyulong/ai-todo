@@ -128,7 +128,13 @@ docker compose exec -e AI_TODO_BASE_URL=http://127.0.0.1:8787 app node dist/src/
 
 ## 3. MCP 客户端怎么接
 
-**MCP 是 stdio 协议**：AI 客户端（Claude Code / Cursor / Cline 等）负责把 MCP Server 拉起来，通过 stdin/stdout 通信。所以密钥（`AI_TODO_TOKEN`）必须出现在**拉起它的那台机器**的环境变量里。
+**MCP 是 stdio 协议**：AI 客户端（Claude Code / Cursor / Cline / Trae 等）负责把 MCP Server 拉起来，通过 stdin/stdout 通信。所以密钥（`AI_TODO_TOKEN`）必须出现在**拉起它的那台机器**的环境变量里。
+
+> ⚠️ **最容易踩的一个坑：`args` 里的路径必须是「拉起 MCP 的那台机器」上的路径。**
+> AI 客户端是在**你自己的电脑**上 spawn 这个进程的，Docker 镜像里的 `/app/dist/src/cli.js`
+> 是**容器内**的路径，写进客户端配置会直接报 `Cannot find module '/app/dist/src/cli.js'`。
+> 容器里跑的只是**服务端**；MCP Server 是个很薄的 HTTP 客户端，在哪儿跑都行——
+> 只要它能通过 `AI_TODO_BASE_URL` 找到服务端。
 
 ### 方案 A（推荐）：MCP 客户端跑在本机
 
@@ -152,6 +158,27 @@ docker compose exec -e AI_TODO_BASE_URL=http://127.0.0.1:8787 app node dist/src/
 这是最省事的路子：不需要把 MCP 也塞进容器，调试也方便。
 
 > 本机的 MCP Server 需要先构建一次：`npm install && npm run build`（只需要 `dist/`，不需要在本地跑服务）。
+
+**服务端和客户端不在同一台机器时**（比如服务端在另一台 Linux / NAS 上，AI 客户端在你的电脑上），
+只有 `AI_TODO_BASE_URL` 要改成服务端那台的地址，**`args` 依然填你自己电脑上的路径**：
+
+```json
+{
+  "mcpServers": {
+    "ai-todo": {
+      "command": "node",
+      "args": ["C:/Users/你的用户名/Documents/projects/ai-todo/dist/src/cli.js", "mcp"],
+      "env": {
+        "AI_TODO_BASE_URL": "http://192.168.1.20:8787",
+        "AI_TODO_TOKEN": "ait_xxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+> Windows 上如果客户端提示找不到 `node`，把 `command` 改成 Node 的绝对路径
+> （`C:\\Program Files\\nodejs\\node.exe`），并把 `args` 里的路径写成双反斜杠或正斜杠。
 
 ### 方案 B：MCP 也跑在容器里
 
