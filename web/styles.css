@@ -589,7 +589,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.toolbar-right { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .toolbar-right .select { width: auto; }
 .toolbar-right .input { width: 170px; }
 
@@ -717,6 +717,45 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .tag.st-done { color: var(--muted); }
 
 .meta-sep { color: var(--border-strong); }
+
+/* ------------------------------------------------------------------
+   来源与项目 chip
+   两者以前都只是元信息行里的普通文字，被「·」隔开，看起来跟提醒时间
+   没区别——「这条是哪个工具发的、哪个项目的」根本看不出来。
+   现在给它们独立造型：来源是可点的（点了就筛选），项目是静态标签。
+   ------------------------------------------------------------------ */
+.src-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.6;
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  color: var(--accent);
+  max-width: 200px;
+  overflow: hidden;
+}
+.src-chip svg { width: 12px; height: 12px; flex: none; }
+.src-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 来源是可点的：悬停时描边 + 手型，表明能点 */
+button.src-chip {
+  cursor: pointer;
+  font-family: inherit;
+  border-color: transparent;
+  transition: border-color .15s, background .15s;
+}
+button.src-chip:hover { border-color: var(--accent); }
+
+.src-chip.is-project {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-2);
+}
 
 .link-chip {
   display: inline-flex;
@@ -878,6 +917,25 @@ textarea.input { resize: vertical; line-height: 1.5; }
   word-break: break-all;
   margin: 0;
 }
+
+/* 配置块 + 标题行 + 复制按钮 */
+.code-block-wrap {
+  margin-top: 12px;
+}
+.code-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.code-block-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.code-copy { flex: none; }
+.code-block-wrap .hint { margin: 0 0 6px; }
 
 .status-row {
   display: flex;

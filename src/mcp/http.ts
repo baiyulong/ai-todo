@@ -11,11 +11,16 @@ export interface McpHttpOptions {
   internalBaseUrl: string;
   /** 默认来源标识。客户端可用 X-Ai-Todo-Agent 头覆盖。 */
   defaultAgent: string;
+  /** 默认来源项目。客户端可用 X-Ai-Todo-Project 头覆盖。 */
+  defaultProject?: string;
   sourceLabel?: string;
 }
 
 /** 客户端自报的来源标识：只允许一小段安全字符，避免任意文本进库 */
 const AGENT_PATTERN = /^[A-Za-z0-9._-]{1,60}$/;
+
+/** 来源项目：允许中文、空格、斜杠、@ 等常见项目名，但仍有长度上限 */
+const PROJECT_PATTERN = /^[\w.\-/@ ]{1,120}$/;
 
 /**
  * 同一枚令牌 → 同一个 session key。
@@ -28,9 +33,20 @@ function sessionKeyForToken(token: string): string {
   return `http-${createHash('sha256').update(token).digest('hex').slice(0, 16)}`;
 }
 
-function normalizeAgent(raw: string | string[] | undefined, fallback: string): string {
+function headerValue(raw: string | string[] | undefined): string | undefined {
   const value = Array.isArray(raw) ? raw[0] : raw;
+  return value?.trim() || undefined;
+}
+
+function normalizeAgent(raw: string | string[] | undefined, fallback: string): string {
+  const value = headerValue(raw);
   if (value && AGENT_PATTERN.test(value)) return value;
+  return fallback;
+}
+
+function normalizeProject(raw: string | string[] | undefined, fallback?: string): string | undefined {
+  const value = headerValue(raw);
+  if (value && PROJECT_PATTERN.test(value)) return value;
   return fallback;
 }
 
@@ -117,6 +133,7 @@ export function createMcpHttpHandler(opts: McpHttpOptions) {
       token,
       sessionKey: sessionKeyForToken(token),
       agent: normalizeAgent(req.headers['x-ai-todo-agent'], opts.defaultAgent),
+      sourceProject: normalizeProject(req.headers['x-ai-todo-project'], opts.defaultProject),
       sourceLabel: opts.sourceLabel,
     });
 

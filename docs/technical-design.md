@@ -2,7 +2,7 @@
 
 > 目标：AI 通过 MCP 把「已完成、需要我关注」的事项推进 Todo；服务在满足规则时提醒到桌面；我在桌面上查看与处置。
 
-- 版本：v0.14（配置 A + 账号体系已实现；修复通知聚合跨账号串台与聚合窗口崩溃；补齐两级删除与批量清空通路；补齐 Docker Compose 双形态部署；全系统多语言（简中 / English）；**新增远程 MCP over Streamable HTTP，客户端零安装**；附录 A 记录实现现状）
+- 版本：v0.15（配置 A + 账号体系已实现；修复通知聚合跨账号串台与聚合窗口崩溃；补齐两级删除与批量清空通路；补齐 Docker Compose 双形态部署；全系统多语言（简中 / English）；**新增远程 MCP over Streamable HTTP，客户端零安装**；**任务来源与来源项目可视化 + 按来源筛选**；附录 A 记录实现现状）
 - 日期：2026-10-28
 - 变更：
   - **v0.3** 范围收敛为纯桌面端，移除 Web Push / Bark / 全部移动端
@@ -490,8 +490,17 @@ stateDiagram-v2
 |---|---|---|
 | `AI_TODO_BASE_URL` | `http://127.0.0.1:8787` | 服务地址 |
 | `AI_TODO_SESSION_KEY` | 每次启动随机 UUID | 会话标识，决定聚合分组 |
-| `AI_TODO_AGENT` | `mcp-client` | 来源标识 |
-| `AI_TODO_SOURCE_LABEL` | 无 | 来源显示名 |
+| `AI_TODO_AGENT` | `mcp-client` | 来源标识（工具名，显示在任务卡片上） |
+| `AI_TODO_SOURCE_LABEL` | 无 | 来源显示名（卡片上优先显示它） |
+| `AI_TODO_SOURCE_PROJECT` | 无 | 来源项目。**AI 没指定 project 时用它兜底**——客户端一定知道自己在哪个项目里干活，AI 不一定记得 |
+
+远程 HTTP 形态用请求头代替环境变量：
+
+| 请求头 | 对应环境变量 | 说明 |
+|---|---|---|
+| `Authorization: Bearer <PAT>` | `AI_TODO_TOKEN` | 访问令牌（必填） |
+| `X-Ai-Todo-Agent` | `AI_TODO_AGENT` | 来源标识 |
+| `X-Ai-Todo-Project` | `AI_TODO_SOURCE_PROJECT` | 来源项目 |
 
 MCP Server 侧约束（实现时必须遵守，否则协议流会被破坏）：
 - stdout **只**输出 JSON-RPC 消息；日志一律 `stderr`
@@ -519,7 +528,7 @@ Base：`/api/v1`，鉴权 `Authorization: Bearer <token>`。
 | DELETE | `/admin/users/{id}` | 删除账号，任务 / 会话 / 令牌一并清除（需 admin） |
 | POST | `/admin/users/{id}/tokens` | 为指定用户签发令牌（需 admin） |
 | POST | `/tasks` | 创建任务（等价于 MCP `todo_create`） |
-| GET | `/tasks` | 列表。`?status=&severity=&project=&q=&limit=&cursor=` |
+| GET | `/tasks` | 列表。`?status=&severity=&project=&source=&q=&limit=&cursor=`（`source` 按 AI 来源过滤） |
 | GET | `/tasks/{id}` | 详情 |
 | PATCH | `/tasks/{id}` | 改字段 |
 | POST | `/tasks/{id}/ack` | 我已接手 |
@@ -1069,6 +1078,7 @@ MCP Server **只认环境变量里的 `AI_TODO_TOKEN`**，缺失就拒绝启动�
 | 11 | §10.1 部署一栏只写「单容器 + 托管 Postgres」，未给具体编排 | **Docker Compose 双形态**：`docker-compose.yml`（app + PostgreSQL 16 容器，生产用）与 `docker-compose.pglite.yml`（单容器 + 内置 PGlite，零外部依赖）；多阶段构建、运行阶段非 root、`.dockerignore` 挡住 `data/` 与 `.env`（本地明文凭据不进镜像）、`init: true` 保证 SIGTERM 能送到 Node | 宿主机零依赖（只需 Docker），与正文「个人规模无需 K8s」一致；两形态共用同一份前端与 REST / MCP 契约，换形态不改代码 |
 | 12 | 界面文案未提及语言方案 | **全系统多语言**：`web/i18n.js` 零依赖 i18n 引擎（`t()` / 语言自动判定 / `localStorage` 持久化 / `data-i18n` 系列属性套用 / 切换事件广播）+ `web/locales/{zh-CN,en-US}.js` 两套语言包；服务端错误按稳定的 `error code` 翻译，参数类错误额外回 `details`（枚举取值、UUID 格式）供界面拼装 | 语言包与界面代码解耦：加一种语言只需新增一个 `xx-XX.js` 并登记，前端代码零改动；界面不依赖服务端文案，因此服务端 `message` 保持中文也不影响多语言 |
 | 13 | §4.1 把远程 HTTP MCP 列为「v2 备选」，§3 部署文档写「为什么不提供远程 HTTP MCP」 | 只要客户端与服务端**不在同一台机器**，stdio 形态就要求客户端机器装 Node、装依赖（74 MB）、还得有一份编译产物——「AI 客户端填个 URL 就能接入」这件事根本做不到 | 服务端新增 `POST /mcp`（Streamable HTTP，**无状态**：不生成 session id、**只认 Bearer PAT 不认会话 Cookie**、单次 JSON 响应不挂 SSE 长连接）；客户端只需一个 URL + 请求头，本机零安装 |
+| 14 | 任务卡片上的「来源」与「项目」混在元信息行里，用「·」隔开 | 来源与项目都是无样式的普通文本，和提醒时间长得一模一样——「这条是哪个工具发的、哪个项目的」根本看不出来；界面上也没有任何按来源筛选的入口 | 来源与项目各给一个独立 chip（来源=机器人图标+可点，项目=文件夹图标）；工具栏加「全部来源」下拉，服务端加 `?source=` 过滤；MCP 客户端可用 `AI_TODO_AGENT` / `AI_TODO_SOURCE_PROJECT`（远程形态是 `X-Ai-Todo-Agent` / `X-Ai-Todo-Project` 头）声明自己是谁、在哪个项目——**AI 自己不一定记得填 project，但客户端一定知道自己在哪个项目里干活** |
 
 ### A.2 实现中修掉的十三个真实缺陷
 
@@ -1112,7 +1122,7 @@ MCP Server **只认环境变量里的 `AI_TODO_TOKEN`**，缺失就拒绝启动�
 
 ### A.3 已验证范围
 
-- **137 项自动化检查**（`scripts/e2e.mjs`）全部通过：健康检查、静态资源、**前端静态检查（5 项）**、用户名密码登录、错误密码被拒、**退出登录后旧会话立即 401**、SSE 推送、任务创建、幂等命中、不打扰场景、冷却窗口聚合、`blocker` 绕过、状态流转（ack / done / archive / snooze）、规则读写、通知记录、**多用户隔离**、令牌自助签发与吊销、禁用账号后令牌立即失效、**非法枚举查询参数返回 400**、**无 body 的 JSON 头 POST 可用**、**非法 JSON body 返回 400**、**`__proto__` 污染被拦截**、**非法 UUID 路径参数返回 400**、**未鉴权请求先回 401**、MCP stdio 全流程（`initialize` / `tools/list` / `tools/call` / `resources/read`）、**MCP 缺少 `AI_TODO_TOKEN` 时拒绝启动**、**管理员通知规则自动归位为默认值**、**通知聚合不跨账号串台**、**账号在窗口期内被删除后服务仍然存活**、**未归档的任务不能彻底删除（409）**、**已归档的任务可以彻底删除且删完真的不见了（404）**、**别的账号删不掉我的任务（404）**、**批量清空可用且条数正确**、**批量清空不动未归档的任务**、**批量清空只影响自己的已归档任务**、**多语言静态检查（6 项）**、**远程 MCP over HTTP 全流程（13 项）**。
+- **151 项自动化检查**（`scripts/e2e.mjs`）全部通过：健康检查、静态资源、**前端静态检查（5 项）**、用户名密码登录、错误密码被拒、**退出登录后旧会话立即 401**、SSE 推送、任务创建、幂等命中、不打扰场景、冷却窗口聚合、`blocker` 绕过、状态流转（ack / done / archive / snooze）、规则读写、通知记录、**多用户隔离**、令牌自助签发与吊销、禁用账号后令牌立即失效、**非法枚举查询参数返回 400**、**无 body 的 JSON 头 POST 可用**、**非法 JSON body 返回 400**、**`__proto__` 污染被拦截**、**非法 UUID 路径参数返回 400**、**未鉴权请求先回 401**、MCP stdio 全流程（`initialize` / `tools/list` / `tools/call` / `resources/read`）、**MCP 缺少 `AI_TODO_TOKEN` 时拒绝启动**、**管理员通知规则自动归位为默认值**、**通知聚合不跨账号串台**、**账号在窗口期内被删除后服务仍然存活**、**未归档的任务不能彻底删除（409）**、**已归档的任务可以彻底删除且删完真的不见了（404）**、**别的账号删不掉我的任务（404）**、**批量清空可用且条数正确**、**批量清空不动未归档的任务**、**批量清空只影响自己的已归档任务**、**多语言静态检查（6 项）**、**远程 MCP over HTTP 全流程（13 项）**、**任务来源与来源筛选（8 项）**、**来源筛选与复制按钮静态检查（6 项）**。
 - **回归断言的有效性已反向验证**：把「分组键加 user_id」「落库前判断账号是否还在」「定时器 catch」「进程级 unhandledRejection 兜底」四道防线逐条撤回后重跑，`隔离账号的通知里不含别人的任务标题` 与 `账号删除后聚合窗口到期，服务仍然存活` 两条断言**同时变红，且服务进程真的崩溃**——与线上那次故障表现一致。
 - **浏览器端验证**：页面渲染正常、SSE 连接建立（顶部显示「实时」）、服务端写入任务后页面无刷新即出现卡片、通知触发时图标与列表同步刷新、控制台零 error / warning。
 - **手动添加实测**：点右下角「+」→ 填标题与详情 → 点「添加」，任务**真的出现在列表里**，顶栏角标 +1，并弹出「已添加」提示。点「取消」则关闭对话框且不创建任务。

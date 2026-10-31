@@ -65,6 +65,8 @@ export class TodoApiClient {
     status?: TaskStatus[];
     severity?: TaskSeverity[];
     project?: string;
+    /** 按来源（agent）过滤，例如 'trae' */
+    source?: string;
     q?: string;
     limit?: number;
   }): Promise<{ tasks: Task[] }> {
@@ -72,6 +74,7 @@ export class TodoApiClient {
     if (params.status?.length) query.set('status', params.status.join(','));
     if (params.severity?.length) query.set('severity', params.severity.join(','));
     if (params.project) query.set('project', params.project);
+    if (params.source) query.set('source', params.source);
     if (params.q) query.set('q', params.q);
     if (params.limit) query.set('limit', String(params.limit));
     const qs = query.toString();

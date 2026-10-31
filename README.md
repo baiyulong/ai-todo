@@ -289,6 +289,52 @@ node scripts/mcp-http-check.mjs --url http://192.168.1.20:8787/mcp --token ait_x
 
 ---
 
+## 任务来源：哪个工具发的、哪个项目
+
+任务卡片上会有两个独立的标签：**来源**（机器人图标，AI 工具名）和**来源项目**（文件夹图标）。
+来源标签**点一下就按这个来源筛选**，也可以用工具栏的「全部来源」下拉筛。
+
+### 让来源标识生效
+
+| 变量 / 请求头 | 作用 | 缺省 |
+|---|---|---|
+| `AI_TODO_AGENT` / `X-Ai-Todo-Agent` | 来源标识（工具名），如 `trae`、`qoder` | `mcp-client` / `mcp-http` |
+| `AI_TODO_SOURCE_PROJECT` / `X-Ai-Todo-Project` | 来源项目。**AI 没在工具参数里指定 `project` 时用它兜底** | 无 |
+| `AI_TODO_SOURCE_LABEL` | 来源显示名（卡片上优先显示它） | 无 |
+
+stdio 形态（客户端与服务端同一台机器）用环境变量：
+
+```json
+"env": {
+  "AI_TODO_BASE_URL": "http://127.0.0.1:8787",
+  "AI_TODO_TOKEN": "ait_xxxxxxxx",
+  "AI_TODO_AGENT": "trae",
+  "AI_TODO_SOURCE_PROJECT": "ai-todo-web"
+}
+```
+
+远程 HTTP 形态用请求头：
+
+```json
+"headers": {
+  "Authorization": "Bearer ait_xxxxxxxx",
+  "X-Ai-Todo-Agent": "trae",
+  "X-Ai-Todo-Project": "ai-todo-web"
+}
+```
+
+> `AI_TODO_SOURCE_PROJECT` 的意义：AI 自己不一定记得填 `project`，
+> 但**客户端一定知道自己在哪个项目里干活**。让客户端兜底，
+> 「这个任务是 qoder 在 ai-todo-web 项目里推的」才永远查得到。
+
+### 按来源筛选
+
+- 界面：工具栏「全部来源」下拉，或直接点任务卡片上的来源标签
+- 接口：`GET /api/v1/tasks?source=trae`
+- MCP：`todo_list` 工具支持 `source` 参数
+
+---
+
 ## 通知规则
 
 在 Web 界面右上角齿轮图标里可改，也可用 REST 接口 `PUT /api/v1/rules`：
@@ -384,7 +430,7 @@ web/
   manifest.webmanifest
   icon.svg
 scripts/
-  e2e.mjs            端到端验证脚本（137 项检查）
+  e2e.mjs            端到端验证脚本（151 项检查）
   mcp-http-check.mjs 远程 MCP 连通性自检（会真的建一条任务再归档掉）
   start.cmd          Windows 一键启动（自动定位 Node、必要时先编译）
 Dockerfile           多阶段构建：编译 → 只留运行时依赖与产物，非 root 运行
@@ -393,7 +439,7 @@ docker-compose.pglite.yml  轻量部署：单容器，内置 PGlite
 .dockerignore        挡住 data/、.env、node_modules 等，不让本地凭据进镜像
 .env.example         容器部署可用环境变量清单
 docs/
-  technical-design.md       技术方案 v0.14
+  technical-design.md       技术方案 v0.15
   deployment.md              Docker 部署指南（部署 / 备份 / MCP 接入 / 排错）
   form-factor-research.html 形态选型调研报告
 ```
@@ -435,7 +481,7 @@ docs/
 | `GET`/`POST` | `/api/v1/admin/users` | 列出 / 新建账号（需 admin） |
 | `PATCH`/`DELETE` | `/api/v1/admin/users/:id` | 改账号（禁用 / 改密码 / 改角色）/ 删除账号 |
 | `POST` | `/api/v1/admin/users/:id/tokens` | 为指定用户签发令牌（需 admin） |
-| `GET`/`POST` | `/api/v1/tasks` | 列表 / 创建 |
+| `GET`/`POST` | `/api/v1/tasks` | 列表 / 创建。列表支持 `?status=&severity=&project=&source=&q=&limit=`（`source` 按 AI 来源过滤，如 `trae`） |
 | `GET`/`PATCH` | `/api/v1/tasks/:id` | 详情 / 修改 |
 | `DELETE` | `/api/v1/tasks/:id` | 彻底删除（不可恢复，只对已归档的任务开放） |
 | `DELETE` | `/api/v1/tasks/archived` | 批量清空自己的已归档任务，返回 `{ deleted: N }` |
@@ -469,7 +515,7 @@ npm start            # 另开一个终端保持运行
 node scripts/e2e.mjs # 另一个终端跑验证
 ```
 
-覆盖 137 项检查：健康检查、静态资源、**前端静态检查（5 项）**、**i18n 静态检查（6 项）**、用户名密码登录、错误密码被拒、**退出登录后旧会话立即 401**、SSE 推送、任务创建、幂等命中、不打扰场景、冷却窗口聚合、blocker 绕过、状态流转、归档、规则读写、通知记录、**多用户隔离**、令牌自助签发与吊销、禁用账号后令牌立即失效、**非法枚举查询参数返回 400**、**无 body 的 JSON 头 POST 可用**、**非法 JSON body 返回 400**、**`__proto__` 污染被拦截**、**非法 UUID 路径参数返回 400**、**未鉴权请求先回 401**、MCP stdio 全流程、**MCP 缺少环境变量凭证时拒绝启动**、**远程 MCP（HTTP）鉴权与工具一致性**、**通知聚合不跨账号串台**、**账号在聚合窗口期内被删除后服务仍然存活**、**未归档的任务不能彻底删除**、**已归档的任务可以彻底删除**、**别的账号删不掉我的任务**、**批量清空只清自己的已归档任务**。
+覆盖 151 项检查：健康检查、静态资源、**前端静态检查（5 项）**、**i18n 静态检查（6 项）**、用户名密码登录、错误密码被拒、**退出登录后旧会话立即 401**、SSE 推送、任务创建、幂等命中、不打扰场景、冷却窗口聚合、blocker 绕过、状态流转、归档、规则读写、通知记录、**多用户隔离**、令牌自助签发与吊销、禁用账号后令牌立即失效、**非法枚举查询参数返回 400**、**无 body 的 JSON 头 POST 可用**、**非法 JSON body 返回 400**、**`__proto__` 污染被拦截**、**非法 UUID 路径参数返回 400**、**未鉴权请求先回 401**、MCP stdio 全流程、**MCP 缺少环境变量凭证时拒绝启动**、**远程 MCP（HTTP）鉴权与工具一致性**、**按来源筛选与跨账号隔离**、**通知聚合不跨账号串台**、**账号在聚合窗口期内被删除后服务仍然存活**、**未归档的任务不能彻底删除**、**已归档的任务可以彻底删除**、**别的账号删不掉我的任务**、**批量清空只清自己的已归档任务**。
 
 脚本默认连 `http://127.0.0.1:8787` 并读 `data/admin-credentials.txt`；指向别的实例时用环境变量覆盖：
 

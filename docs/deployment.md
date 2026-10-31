@@ -220,8 +220,20 @@ Trae / Cursor / Claude Code 都原生支持远程 HTTP MCP（Trae 在「设置 �
 | 端点 | `POST /mcp`（`GET` / `DELETE` 在无状态模式下返回 405） |
 | 鉴权 | 只认 `Authorization: Bearer <访问令牌>`，**不接受会话 Cookie** |
 | 会话 | 无状态——服务端不存任何会话状态，多实例、重启都不影响 |
-| 来源标识 | 客户端可带 `X-Ai-Todo-Agent` 头标记自己（如 `trae`、`cursor`），任务卡片上会显示 |
+| 来源标识 | 客户端可带 `X-Ai-Todo-Agent`（工具名）与 `X-Ai-Todo-Project`（来源项目）两个头，任务卡片上会分别显示 |
 | 开关 | `AI_TODO_MCP_HTTP=off` 可关闭该端点 |
+
+> **来源标识值得填**：不填的话任务上只有项目名（AI 自己填的），
+> 不知道是哪个工具推来的。填了之后卡片上会出现 🤖 工具名 + 📁 项目名两个标签，
+> 点工具名还能直接按来源筛选。
+>
+> ```json
+> "headers": {
+>   "Authorization": "Bearer ait_xxxxxxxx",
+>   "X-Ai-Todo-Agent": "trae",
+>   "X-Ai-Todo-Project": "ai-todo-web"
+> }
+> ```
 
 配置完拿脚本自检一遍（会真的建一条任务再归档掉）：
 

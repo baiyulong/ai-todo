@@ -127,6 +127,10 @@
         <option value="need_human" data-i18n="severity.need_human"></option>
         <option value="info" data-i18n="severity.info"></option>
       </select>
+      <!-- 来源筛选：选项由 /api/v1/me 的 sources 动态生成（哪些 AI 工具推过任务） -->
+      <select class="select" id="filter-source" data-i18n-aria-label="toolbar.filterSource">
+        <option value="" data-i18n="toolbar.allSources"></option>
+      </select>
       <input class="input" id="filter-q" type="search" data-i18n-placeholder="toolbar.searchPlaceholder" data-i18n-aria-label="toolbar.searchLabel">
     </div>
   </div>

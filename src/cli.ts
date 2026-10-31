@@ -192,7 +192,10 @@ async function runMcp(): Promise<void> {
         '               }\n' +
         '             }\n' +
         '           }\n' +
-        '           令牌可在 Web 端「设置 → 访问令牌」自助签发。\n',
+        '           令牌可在 Web 端「设置 → 访问令牌」自助签发。\n' +
+        '           想让任务标出「哪个工具发的哪个项目」，再加：\n' +
+        '             AI_TODO_AGENT=trae            来源标识\n' +
+        '             AI_TODO_SOURCE_PROJECT=my-app 来源项目\n',
     );
     process.exit(1);
   }
@@ -203,8 +206,9 @@ async function runMcp(): Promise<void> {
   const sessionKey = process.env.AI_TODO_SESSION_KEY?.trim() || defaultSessionKey();
   const agent = process.env.AI_TODO_AGENT?.trim() || 'mcp-client';
   const sourceLabel = process.env.AI_TODO_SOURCE_LABEL?.trim() || undefined;
+  const sourceProject = process.env.AI_TODO_SOURCE_PROJECT?.trim() || undefined;
 
-  await runStdioServer({ baseUrl, token, sessionKey, agent, sourceLabel });
+  await runStdioServer({ baseUrl, token, sessionKey, agent, sourceLabel, sourceProject });
 }
 
 /* ---------------------------------------------------------------- 用户管理 */
@@ -320,27 +324,61 @@ async function userCommand(): Promise<void> {
     console.log('  ─────────────────────────────────────────');
     console.log(`  ${payload.token}`);
     console.log('');
-    console.log('  只显示这一次。请放进 AI 客户端的 AI_TODO_TOKEN 环境变量：');
+    console.log('  只显示这一次。放进 AI 客户端的 MCP 配置：');
     console.log('');
-    console.log('  {');
-    console.log('    "mcpServers": {');
-    console.log('      "ai-todo": {');
-    console.log('        "command": "node",');
-    console.log(`        "args": ["${join(packageRoot, 'dist', 'src', 'cli.js')}", "mcp"],`);
-    console.log('        "env": {');
-    console.log(`          "AI_TODO_BASE_URL": "${base}",`);
-    console.log(`          "AI_TODO_TOKEN": "${payload.token}"`);
-    console.log('        }');
-    console.log('      }');
-    console.log('    }');
-    console.log('  }');
-    console.log('');
+    printMcpConfig(base, payload.token);
     return;
   }
 
   console.error(`未知子命令：user ${sub}`);
   console.log(USAGE);
   process.exit(1);
+}
+
+/**
+ * 打印 MCP 客户端配置示例。
+ *
+ * 两种传输都给出来：
+ * - **远程 HTTP（推荐）**：客户端机器什么都不用装，只要一个 URL + 令牌
+ * - **stdio**：客户端与服务端在同一台机器时用
+ *
+ * 顺带提示来源标识相关的环境变量——用户真正缺的往往不是配置本身，
+ * 而是「推过来的任务看不出是哪个工具发的」。
+ */
+function printMcpConfig(base: string, token: string): void {
+  const httpUrl = `${base.replace(/\/$/, '')}/mcp`;
+  console.log('  ── 方案一：远程 HTTP（推荐，客户端机器什么都不用装）──');
+  console.log('  {');
+  console.log('    "mcpServers": {');
+  console.log('      "ai-todo": {');
+  console.log(`        "url": "${httpUrl}",`);
+  console.log('        "headers": {');
+  console.log(`          "Authorization": "Bearer ${token}"`);
+  console.log('        }');
+  console.log('      }');
+  console.log('    }');
+  console.log('  }');
+  console.log('');
+  console.log('  ── 方案二：stdio（客户端与服务端在同一台机器时）──');
+  console.log('  {');
+  console.log('    "mcpServers": {');
+  console.log('      "ai-todo": {');
+  console.log('        "command": "node",');
+  console.log(`        "args": ["${join(packageRoot, 'dist', 'src', 'cli.js')}", "mcp"],`);
+  console.log('        "env": {');
+  console.log(`          "AI_TODO_BASE_URL": "${base}",`);
+  console.log(`          "AI_TODO_TOKEN": "${token}"`);
+  console.log('        }');
+  console.log('      }');
+  console.log('    }');
+  console.log('  }');
+  console.log('');
+  console.log('  令牌决定任务推给哪个账号。想在任务上标出「哪个工具发的哪个项目」，');
+  console.log('  远程 HTTP 方式加请求头，stdio 方式加环境变量：');
+  console.log('');
+  console.log('    AI_TODO_AGENT=trae             来源标识（工具名，显示在任务卡片上）');
+  console.log('    AI_TODO_SOURCE_PROJECT=my-app  来源项目（AI 没指定 project 时用它兜底）');
+  console.log('');
 }
 
 /* ---------------------------------------------------------------- token */
@@ -366,19 +404,7 @@ async function mintToken(): Promise<void> {
   console.log(`  ${payload.token}`);
   console.log('');
   console.log('  MCP 客户端配置示例：');
-  console.log('  {');
-  console.log('    "mcpServers": {');
-  console.log('      "ai-todo": {');
-  console.log('        "command": "node",');
-  console.log(`        "args": ["${join(packageRoot, 'dist', 'src', 'cli.js')}", "mcp"],`);
-  console.log('        "env": {');
-  console.log(`          "AI_TODO_BASE_URL": "${base}",`);
-  console.log(`          "AI_TODO_TOKEN": "${payload.token}"`);
-  console.log('        }');
-  console.log('      }');
-  console.log('    }');
-  console.log('  }');
-  console.log('');
+  printMcpConfig(base, payload.token);
 }
 
 /* ---------------------------------------------------------------- main */

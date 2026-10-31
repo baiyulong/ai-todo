@@ -47,6 +47,8 @@ export const dict = {
   'toolbar.clearArchivedCount': 'Clear archived ({count})',
   'toolbar.allSeverities': 'All levels',
   'toolbar.filterSeverity': 'Filter by level',
+  'toolbar.allSources': 'All sources',
+  'toolbar.filterSource': 'Filter by source',
   'toolbar.searchPlaceholder': 'Search…',
   'toolbar.searchLabel': 'Search tasks',
 
@@ -66,6 +68,8 @@ export const dict = {
   // ---------------- Task card ----------------
   'task.addTitle': 'Add a task manually',
   'task.remindAt': 'Remind {time}',
+  'task.sourceTitle': 'Source: {agent} (session {session}) · click to filter by this source',
+  'task.projectTitle': 'Source project: {project}',
   'task.deleteTitle': 'Archive (recoverable from the “All” tab)',
   'task.hardDeleteTitle': 'Delete permanently (cannot be undone)',
   'task.deleteLabel': 'Archive task',
@@ -153,10 +157,19 @@ export const dict = {
   'token.copyFailedToast': 'Copy failed — select it and copy manually',
 
   // ---------------- MCP ----------------
-  'mcp.hint': 'Paste this into your AI client’s MCP configuration (MCode / Claude Code / Cursor) and the AI can push finished tasks to you.',
+  'mcp.hint': 'Paste this into your AI client’s MCP configuration (MCode / Claude Code / Cursor / Trae) and the AI can push finished tasks to you.',
   'mcp.args': '<your project path>/dist/src/cli.js',
   'mcp.tokenPlaceholder': '<paste a token issued above>',
   'mcp.isolation': 'Each user only sees their own tasks — the token decides who a task lands for.',
+  'mcp.httpTitle': 'Option 1 · Remote HTTP (recommended — nothing to install on the client)',
+  'mcp.httpHint': 'Pick the “HTTP” transport in your AI client, then paste this URL and header.',
+  'mcp.stdioTitle': 'Option 2 · stdio (when the client and the server share one machine)',
+  'mcp.stdioHint': 'The AI client runs it as a local child process; the credential travels in an env var.',
+  'mcp.copy': 'Copy',
+  'mcp.copied': 'Copied',
+  'mcp.copyFailed': 'Copy failed — select it and copy manually',
+  'mcp.copyNeedToken': 'Copied, but the token is still a placeholder — issue a real token and replace it first',
+  'mcp.sourceHint': 'To label tasks with “which tool, which project”: add the X-Ai-Todo-Agent and X-Ai-Todo-Project headers (remote), or the AI_TODO_AGENT and AI_TODO_SOURCE_PROJECT env vars (stdio).',
 
   // ---------------- User management ----------------
   'user.hint': 'Administrators can create and disable accounts. Initial passwords and access tokens are shown only once.',

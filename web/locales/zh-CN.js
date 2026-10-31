@@ -47,6 +47,8 @@ export const dict = {
   'toolbar.clearArchivedCount': '清空已归档（{count}）',
   'toolbar.allSeverities': '全部级别',
   'toolbar.filterSeverity': '按级别筛选',
+  'toolbar.allSources': '全部来源',
+  'toolbar.filterSource': '按来源筛选',
   'toolbar.searchPlaceholder': '搜索…',
   'toolbar.searchLabel': '搜索任务',
 
@@ -66,6 +68,8 @@ export const dict = {
   // ---------------- 任务卡片 ----------------
   'task.addTitle': '手动添加任务',
   'task.remindAt': '提醒 {time}',
+  'task.sourceTitle': '来源：{agent}（会话 {session}）· 点一下按这个来源筛选',
+  'task.projectTitle': '来源项目：{project}',
   'task.deleteTitle': '删除（可在「全部」标签里找回）',
   'task.hardDeleteTitle': '彻底删除（不可恢复）',
   'task.deleteLabel': '删除任务',
@@ -153,10 +157,19 @@ export const dict = {
   'token.copyFailedToast': '复制失败，请手动选中复制',
 
   // ---------------- MCP ----------------
-  'mcp.hint': '把下面这段加到你的 AI 客户端（MCode / Claude Code / Cursor）的 MCP 配置里，AI 就能把完成的任务推进来。',
+  'mcp.hint': '把下面这段加到你的 AI 客户端（MCode / Claude Code / Cursor / Trae）的 MCP 配置里，AI 就能把完成的任务推进来。',
   'mcp.args': '<你的项目路径>/dist/src/cli.js',
   'mcp.tokenPlaceholder': '<在上一栏签发一枚令牌后填这里>',
   'mcp.isolation': '每个用户只会看到自己的任务：令牌决定了任务推给谁。',
+  'mcp.httpTitle': '方式一 · 远程 HTTP（推荐，客户端机器什么都不用装）',
+  'mcp.httpHint': 'AI 客户端里选「HTTP」类型，填这个地址和请求头即可。',
+  'mcp.stdioTitle': '方式二 · stdio（客户端与服务端在同一台机器时）',
+  'mcp.stdioHint': 'AI 客户端会把它当本地子进程拉起来，凭据走环境变量。',
+  'mcp.copy': '复制',
+  'mcp.copied': '已复制',
+  'mcp.copyFailed': '复制失败，请手动选中复制',
+  'mcp.copyNeedToken': '已复制，但令牌还是占位符——请先签发一枚真实令牌再替换进去',
+  'mcp.sourceHint': '想让任务标出「哪个工具发的哪个项目」：远程方式加请求头 X-Ai-Todo-Agent 与 X-Ai-Todo-Project，stdio 方式加环境变量 AI_TODO_AGENT 与 AI_TODO_SOURCE_PROJECT。',
 
   // ---------------- 用户管理 ----------------
   'user.hint': '管理员可以新建账号、禁用账号。初始密码与访问令牌只显示一次。',

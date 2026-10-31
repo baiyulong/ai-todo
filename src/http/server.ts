@@ -315,6 +315,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       // 工具回调 REST API 时走回环地址：不经过端口映射，容器内外都成立
       internalBaseUrl: `http://127.0.0.1:${config.port}`,
       defaultAgent: process.env.AI_TODO_AGENT?.trim() || 'mcp-http',
+      defaultProject: process.env.AI_TODO_SOURCE_PROJECT?.trim() || undefined,
       sourceLabel: process.env.AI_TODO_SOURCE_LABEL?.trim() || undefined,
     });
     // GET / DELETE 在无状态模式下由传输层自己回 405 并说明原因，
@@ -622,6 +623,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       status: status.values as TaskStatus[] | undefined,
       severity: severity.values as TaskSeverity[] | undefined,
       project: q.project,
+      source: q.source?.trim() || undefined,
       q: q.q,
       limit: q.limit ? Number(q.limit) : undefined,
       offset: q.offset ? Number(q.offset) : undefined,

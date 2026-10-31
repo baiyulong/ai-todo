@@ -226,6 +226,44 @@ async function main() {
     '登录表单留在 DOM 里会让浏览器工具反复触发「认证接管」闸门，整个会话的工具被锁死',
   );
 
+  // 来源筛选：下拉必须存在，且请求要带上 source 参数。
+  // 少了任何一个，用户就只能在一堆任务里靠肉眼找「哪个工具发的」。
+  check(
+    '工具栏有「按来源筛选」下拉',
+    /id="filter-source"/.test(indexHtml),
+    '缺少来源筛选下拉，无法区分不同 AI 工具推来的任务',
+  );
+  check(
+    '任务列表请求会带上来源筛选参数',
+    /params\.set\('source'/.test(appJs),
+    '筛选参数没有传到接口上，下拉选了也不生效',
+  );
+
+  // MCP 配置块必须能一键复制：配置要抄进 AI 客户端，手抄错一个字符客户端就起不来。
+  check(
+    'MCP 配置块有复制按钮',
+    /code-copy/.test(appJs) && /copyText/.test(appJs),
+    '没有复制按钮，用户只能手抄 JSON，容易抄错',
+  );
+  check(
+    '剪贴板写入有兜底路径（局域网 http 访问时 navigator.clipboard 不可用）',
+    /execCommand\('copy'\)/.test(appJs),
+    'navigator.clipboard 只在安全上下文可用，局域网 http 访问会直接失效',
+  );
+
+  // MCP 配置必须给出新的远程 HTTP 方案，不能还是只有 stdio。
+  const cliJs = readFileSync(join(root, 'src', 'cli.ts'), 'utf8');
+  check(
+    'CLI 生成的 MCP 配置包含远程 HTTP 方案',
+    /"url"/.test(cliJs) && /\/mcp/.test(cliJs),
+    'CLI 还在生成过时的 stdio 配置，用户照抄会装不上远程端点',
+  );
+  check(
+    'CLI 提示了来源标识相关环境变量',
+    /AI_TODO_SOURCE_PROJECT/.test(cliJs),
+    '没有提示来源标识，用户就看不出任务是谁发的',
+  );
+
   /* ---------------------------------------------------- i18n 静态检查 */
 
   // 两个语言包的键必须完全对齐：少一个键，切到那个语言就会露出键名本身。
@@ -1131,6 +1169,81 @@ async function main() {
   await httpClient.callTool({ name: 'todo_archive', arguments: { id: httpTaskId } });
   await httpClient.close();
   await httpTransport.close?.();
+
+  /* 18. 任务来源与来源筛选 */
+  console.log('\n[18] 任务来源与来源筛选');
+
+  // 两个不同来源（agent）各推一条任务，才能验证「按来源筛选」真的分得开。
+  const srcStamp = Date.now();
+  const srcTasks = [];
+  for (const agent of ['trae', 'qoder']) {
+    const r = await userApi('/api/v1/tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: `来源筛选测试 ${agent} ${srcStamp}`,
+        severity: 'need_human',
+        project: 'src-filter-demo',
+        idempotency_key: `e2e:${srcStamp}:src:${agent}`,
+        source: { agent, session_key: `e2e-src-${agent}-${srcStamp}` },
+      }),
+    });
+    check(
+      `用来源 ${agent} 成功创建任务`,
+      r.res.status === 201 && !!r.body.task?.source_id,
+      `HTTP ${r.res.status} source_id=${r.body.task?.source_id}`,
+    );
+    // 注意：任务 id 与来源 id 是两个东西，别混用
+    srcTasks.push({ agent, taskId: r.body.task?.id, sourceId: r.body.task?.source_id });
+  }
+
+  const byTrae = await userApi(`/api/v1/tasks?source=trae&limit=200`);
+  const traeTasks = byTrae.body.tasks || [];
+  check(
+    '按来源筛选：只返回该来源的任务',
+    traeTasks.length > 0 && traeTasks.every((x) => x.source_id === srcTasks[0].sourceId),
+    `返回 ${traeTasks.length} 条`,
+  );
+  check(
+    '按来源筛选：不会混进别的来源',
+    !traeTasks.some((x) => x.source_id === srcTasks[1].sourceId),
+    '混进了另一个来源的任务',
+  );
+
+  const byQoder = await userApi(`/api/v1/tasks?source=qoder&limit=200`);
+  check(
+    '按来源筛选：换一个来源得到另一批任务',
+    (byQoder.body.tasks || []).some((x) => x.source_id === srcTasks[1].sourceId),
+    `返回 ${(byQoder.body.tasks || []).length} 条`,
+  );
+
+  const noFilter = await userApi('/api/v1/tasks?limit=200');
+  check(
+    '不带 source 参数时两个来源都能看到',
+    (noFilter.body.tasks || []).some((x) => x.source_id === srcTasks[0].sourceId) &&
+      (noFilter.body.tasks || []).some((x) => x.source_id === srcTasks[1].sourceId),
+    '过滤条件不该影响不带参数时的结果',
+  );
+
+  // 隔离：别的账号用同样的 source 参数也筛不到你的任务
+  const otherByTrae = await api(`/api/v1/tasks?source=trae&limit=200`);
+  check(
+    '按来源筛选不跨账号泄露',
+    !(otherByTrae.body.tasks || []).some((x) => x.source_id === srcTasks[0].sourceId),
+    '别的账号看到了我的任务',
+  );
+
+  const meSources = await userApi('/api/v1/me');
+  const agentNames = (meSources.body.sources || []).map((s) => s.agent);
+  check(
+    '来源列表能拿到 agent 名称（供筛选下拉用）',
+    agentNames.includes('trae') && agentNames.includes('qoder'),
+    agentNames.join(','),
+  );
+
+  // 清理这两条来源测试任务
+  for (const s of srcTasks) {
+    await userApi(`/api/v1/tasks/${s.taskId}/archive`, { method: 'POST' });
+  }
 
   /* 清理 */
   console.log('\n[清理] 归档测试任务并删除测试账号');

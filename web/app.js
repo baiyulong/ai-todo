@@ -6,6 +6,7 @@ const state = {
   tasks: [],
   status: 'pending',
   severity: '',
+  source: '',
   q: '',
   selectedId: null,
   sources: new Map(),
@@ -269,6 +270,38 @@ async function loadSources() {
     const { sources } = await api.get('/api/v1/me');
     state.sources = new Map((sources || []).map((s) => [s.id, s]));
   } catch { /* 忽略 */ }
+  renderSourceFilter();
+}
+
+/**
+ * 填充「来源」筛选下拉。
+ *
+ * 选项按 agent 去重：一个工具可能有多个会话（每次 AI 会话一个 session_key），
+ * 但用户想筛的是「哪个工具」，不是「哪次会话」。
+ * 没有任务来源的用户（纯手动添加）就只有一个「全部来源」。
+ */
+function renderSourceFilter() {
+  const sel = $('filter-source');
+  if (!sel) return;
+  const agents = [...new Set([...state.sources.values()].map((s) => s.agent))].sort();
+  const current = state.source;
+
+  sel.textContent = '';
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = t('toolbar.allSources');
+  sel.appendChild(all);
+
+  for (const agent of agents) {
+    const o = document.createElement('option');
+    o.value = agent;
+    o.textContent = agent;
+    sel.appendChild(o);
+  }
+
+  // 当前选的来源可能已经不在列表里（比如来源被删了），别让下拉显示成空
+  if (current && !agents.includes(current)) state.source = '';
+  sel.value = state.source;
 }
 
 async function loadMe() {
@@ -297,6 +330,7 @@ async function loadTasks() {
   const params = new URLSearchParams();
   if (state.status !== 'all') params.set('status', state.status);
   if (state.severity) params.set('severity', state.severity);
+  if (state.source) params.set('source', state.source);
   if (state.q) params.set('q', state.q);
   params.set('limit', '200');
   try {
@@ -357,6 +391,19 @@ const TRASH_ICON = ['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M8 6
 
 // 垃圾桶带叉（Lucide trash-x）—— 彻底删除，不可恢复
 const TRASH_X_ICON = ['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2', 'm10 11 5 5', 'm15 11-5 5'];
+
+// 机器人（Lucide bot）—— 任务来源：哪个 AI 工具推的
+const BOT_ICON = [
+  'M12 8V4H8',
+  'M9 7h6a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-1a5 5 0 0 1 5-5Z',
+  'M9 12h.01',
+  'M15 12h.01',
+  'M9 17v2',
+  'M15 17v2',
+];
+
+// 文件夹（Lucide folder）—— 来源项目
+const FOLDER_ICON = ['M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'];
 
 function renderTasks() {
   const list = $('list');
@@ -437,28 +484,39 @@ function renderTask(task) {
     meta.appendChild(stTag);
   }
 
+  // 来源与项目：两者必须一眼分得开。
+  // 以前都塞在元信息行里、用「·」隔开，看起来跟提醒时间没区别——
+  // 「这条是哪个工具发的、哪个项目的」根本看不出来。
   const source = state.sources.get(task.source_id);
   if (source) {
-    const sep = document.createElement('span');
-    sep.className = 'meta-sep';
-    sep.textContent = '·';
-    meta.appendChild(sep);
-
-    const src = document.createElement('span');
-    src.textContent = source.label || source.agent;
-    src.title = `${source.agent} · ${source.session_key}`;
-    meta.appendChild(src);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'src-chip';
+    chip.appendChild(svgIcon(BOT_ICON));
+    const name = document.createElement('span');
+    name.textContent = source.label || source.agent;
+    chip.appendChild(name);
+    chip.title = t('task.sourceTitle', { agent: source.agent, session: source.session_key });
+    // 点一下就按这个来源筛选
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.source = source.agent;
+      const sel = $('filter-source');
+      if (sel) sel.value = source.agent;
+      loadTasks();
+    });
+    meta.appendChild(chip);
   }
 
   if (task.project) {
-    const sep = document.createElement('span');
-    sep.className = 'meta-sep';
-    sep.textContent = '·';
-    meta.appendChild(sep);
-
-    const prj = document.createElement('span');
-    prj.textContent = task.project;
-    meta.appendChild(prj);
+    const chip = document.createElement('span');
+    chip.className = 'src-chip is-project';
+    chip.appendChild(svgIcon(FOLDER_ICON));
+    const name = document.createElement('span');
+    name.textContent = task.project;
+    chip.appendChild(name);
+    chip.title = t('task.projectTitle', { project: task.project });
+    meta.appendChild(chip);
   }
 
   if (task.due_at) {
@@ -819,6 +877,12 @@ $('filter-severity').addEventListener('change', (e) => {
   loadTasks();
 });
 
+// 来源筛选：下拉选项来自 /api/v1/me 的 sources（哪些 AI 工具推过任务）
+$('filter-source').addEventListener('change', (e) => {
+  state.source = e.target.value;
+  loadTasks();
+});
+
 let searchTimer;
 $('filter-q').addEventListener('input', (e) => {
   clearTimeout(searchTimer);
@@ -937,6 +1001,8 @@ window.addEventListener('ai-todo:localechange', () => {
   updateClearArchivedButton();
   updateNotifyBanner();
   renderDrawerIfOpen();
+  // 下拉里的「全部来源」是 JS 生成的，得跟着语言重画
+  renderSourceFilter();
 });
 
 function renderDrawerIfOpen() {
@@ -1009,23 +1075,40 @@ async function renderDrawer() {
   // MCP 接入
   const s4 = section(t('section.mcp'));
   s4.appendChild(hint(t('mcp.hint')));
-  const pre = document.createElement('pre');
-  pre.className = 'code-block';
-  const cfg = {
-    mcpServers: {
-      'ai-todo': {
-        command: 'node',
-        args: [t('mcp.args'), 'mcp'],
-        env: {
-          AI_TODO_BASE_URL: location.origin,
-          AI_TODO_TOKEN: state.lastToken || t('mcp.tokenPlaceholder'),
+
+  const token = state.lastToken || t('mcp.tokenPlaceholder');
+  const httpUrl = `${location.origin}/mcp`;
+
+  // 远程 HTTP：客户端机器什么都不用装，只要一个 URL + 令牌
+  s4.appendChild(
+    codeBlock(t('mcp.httpTitle'), t('mcp.httpHint'), {
+      mcpServers: {
+        'ai-todo': {
+          url: httpUrl,
+          headers: { Authorization: `Bearer ${token}` },
         },
       },
-    },
-  };
-  pre.textContent = JSON.stringify(cfg, null, 2);
-  s4.appendChild(pre);
+    }),
+  );
+
+  // stdio：客户端与服务端在同一台机器时用
+  s4.appendChild(
+    codeBlock(t('mcp.stdioTitle'), t('mcp.stdioHint'), {
+      mcpServers: {
+        'ai-todo': {
+          command: 'node',
+          args: [t('mcp.args'), 'mcp'],
+          env: {
+            AI_TODO_BASE_URL: location.origin,
+            AI_TODO_TOKEN: token,
+          },
+        },
+      },
+    }),
+  );
+
   s4.appendChild(hint(t('mcp.isolation')));
+  s4.appendChild(hint(t('mcp.sourceHint')));
   body.appendChild(s4);
 
   // 用户管理（仅管理员）
@@ -1360,6 +1443,90 @@ function hint(text) {
   p.className = 'hint';
   p.textContent = text;
   return p;
+}
+
+/**
+ * 复制文本到剪贴板。
+ *
+ * navigator.clipboard 只在「安全上下文」里可用——HTTPS 或 localhost。
+ * 通过局域网 IP 用 http:// 访问时（http://192.168.1.20:8787）它压根不存在，
+ * 所以必须留 execCommand 这条老路兜底，否则复制按钮在真实部署里直接失效。
+ */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* 落到兜底 */
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 一个带标题、说明与「复制」按钮的 JSON 配置块。
+ * 配置是给人抄进 AI 客户端的，抄错一个字符客户端就起不来——
+ * 所以复制按钮比让人手抄靠谱得多。
+ */
+function codeBlock(title, help, cfg) {
+  const wrap = document.createElement('div');
+  wrap.className = 'code-block-wrap';
+
+  const pre = document.createElement('pre');
+  pre.className = 'code-block';
+  pre.textContent = JSON.stringify(cfg, null, 2);
+
+  const head = document.createElement('div');
+  head.className = 'code-block-head';
+
+  const label = document.createElement('span');
+  label.className = 'code-block-title';
+  label.textContent = title;
+  head.appendChild(label);
+
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn-sm btn-quiet code-copy';
+  copy.textContent = t('mcp.copy');
+  copy.addEventListener('click', async () => {
+    const ok = await copyText(pre.textContent);
+    if (!ok) {
+      toast(t('mcp.copyFailed'), true);
+      return;
+    }
+    copy.textContent = t('mcp.copied');
+    setTimeout(() => {
+      copy.textContent = t('mcp.copy');
+    }, 1600);
+    // 令牌是占位符时提醒一句：复制出去的配置是跑不起来的
+    if (pre.textContent.includes(t('mcp.tokenPlaceholder'))) {
+      toast(t('mcp.copyNeedToken'));
+    }
+  });
+  head.appendChild(copy);
+  wrap.appendChild(head);
+
+  if (help) wrap.appendChild(hint(help));
+  wrap.appendChild(pre);
+
+  return wrap;
 }
 
 function statusRow(k, v, cls) {

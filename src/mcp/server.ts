@@ -11,6 +11,11 @@ export interface McpServerOptions {
   sessionKey: string;
   agent: string;
   sourceLabel?: string;
+  /**
+   * 来源项目。AI 没在工具参数里指定 project 时用它兜底——
+   * 否则「哪个工具发的哪个项目的任务」就永远缺一半。
+   */
+  sourceProject?: string;
 }
 
 /** stdout 只能承载协议消息，所有日志一律走 stderr */
@@ -83,7 +88,9 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
           title: args.title,
           detail: args.detail,
           severity: args.severity as TaskSeverity | undefined,
-          project: args.project,
+          // AI 没给项目就用客户端声明的来源项目兜底，
+          // 这样「哪个工具发的哪个项目的任务」永远查得到
+          project: args.project ?? opts.sourceProject,
           links: args.links,
           due_at: args.due_at,
           notify: args.notify,
@@ -125,6 +132,7 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
           .describe('默认只查 pending'),
         severity: z.array(z.enum(SEVERITIES)).optional(),
         project: z.string().optional(),
+        source: z.string().optional().describe('按来源（AI 工具名）过滤，例如 trae'),
         q: z.string().optional().describe('标题或正文关键字'),
         limit: z.number().int().min(1).max(200).optional(),
       },
@@ -135,6 +143,7 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
           status: args.status ?? ['pending'],
           severity: args.severity as TaskSeverity[] | undefined,
           project: args.project,
+          source: args.source,
           q: args.q,
           limit: args.limit ?? 50,
         });

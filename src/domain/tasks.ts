@@ -34,6 +34,8 @@ export interface ListTasksFilter {
   status?: TaskStatus[];
   severity?: TaskSeverity[];
   project?: string;
+  /** 按 AI 来源（ai_sources.agent）过滤，例如 'trae' / 'qoder' */
+  source?: string;
   q?: string;
   limit?: number;
   offset?: number;
@@ -137,6 +139,14 @@ export class TaskService {
     if (filter.project) {
       params.push(filter.project);
       where.push(`project = $${params.length}`);
+    }
+    // 按来源过滤：来源记在 ai_sources 表（一个 agent 可能有多个会话），
+    // 所以要用子查询按 agent 匹配，而不是直接比 tasks.source_id。
+    if (filter.source) {
+      params.push(filter.source);
+      where.push(
+        `source_id in (select id from ai_sources where user_id = $1 and agent = $${params.length})`,
+      );
     }
     if (filter.q) {
       params.push(`%${filter.q}%`);
