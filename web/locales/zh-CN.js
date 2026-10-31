@@ -1,0 +1,222 @@
+/* AI Todo · 简体中文语言包 */
+
+export const dict = {
+  // ---------------- 通用 ----------------
+  'app.name': 'AI Todo',
+
+  // ---------------- 登录 ----------------
+  'login.title': '登录 AI Todo',
+  'login.hint': '用你的账号登录。管理员账号的初始密码见',
+  'login.hintFile': 'data/admin-credentials.txt',
+  'login.username': '用户名',
+  'login.usernamePlaceholder': '你的用户名',
+  'login.password': '密码',
+  'login.passwordPlaceholder': '输入密码',
+  'login.submit': '进入',
+  'login.showPassword': '显示密码',
+  'login.hidePassword': '隐藏密码',
+  'login.invalidCredentials': '用户名或密码不正确',
+
+  // ---------------- 顶栏 ----------------
+  'topbar.liveStatus': '实时连接状态',
+  'topbar.connecting': '连接中',
+  'topbar.live': '实时',
+  'topbar.reconnecting': '重连中',
+  'topbar.offline': '未登录',
+  'topbar.currentAccount': '当前账号',
+  'topbar.accountTokens': '账号与令牌',
+  'topbar.logout': '退出登录',
+  'topbar.rules': '通知规则',
+  'topbar.settings': '设置',
+  'topbar.language': '切换语言',
+  'topbar.languageName': '中文',
+
+  // ---------------- 通知权限横幅 ----------------
+  'banner.enable': '开启桌面通知，AI 完成任务时立刻弹横幅提醒。',
+  'banner.enableBtn': '开启通知',
+  'banner.unsupported': '当前浏览器不支持系统通知，将以页内提示代替。',
+  'banner.denied': '通知权限已被拒绝。请在地址栏左侧的网站设置里允许通知，然后刷新页面。',
+  'banner.close': '关闭',
+
+  // ---------------- 工具栏 ----------------
+  'tab.pending': '待处理',
+  'tab.acked': '已接手',
+  'tab.done': '已完成',
+  'tab.all': '全部',
+  'toolbar.clearArchived': '清空已归档',
+  'toolbar.clearArchivedCount': '清空已归档（{count}）',
+  'toolbar.allSeverities': '全部级别',
+  'toolbar.filterSeverity': '按级别筛选',
+  'toolbar.searchPlaceholder': '搜索…',
+  'toolbar.searchLabel': '搜索任务',
+
+  // ---------------- 级别 / 状态 ----------------
+  'severity.info': '记录',
+  'severity.need_human': '需处理',
+  'severity.blocker': '阻塞',
+  'status.pending': '待处理',
+  'status.acked': '已接手',
+  'status.done': '已完成',
+  'status.archived': '已归档',
+
+  // ---------------- 空状态 ----------------
+  'empty.title': '这里很安静',
+  'empty.sub': 'AI 完成任务后会通过 MCP 把需要你关注的事项推到这里。',
+
+  // ---------------- 任务卡片 ----------------
+  'task.addTitle': '手动添加任务',
+  'task.remindAt': '提醒 {time}',
+  'task.deleteTitle': '删除（可在「全部」标签里找回）',
+  'task.hardDeleteTitle': '彻底删除（不可恢复）',
+  'task.deleteLabel': '删除任务',
+  'task.hardDeleteLabel': '彻底删除任务',
+  'task.deletedToast': '已删除，可在「全部」标签里找回',
+
+  // ---------------- 动作按钮 ----------------
+  'action.ack': '接手',
+  'action.done': '完成',
+  'action.snooze': '稍后提醒',
+  'action.snooze1h': '1 小时后',
+  'action.snoozeTonight': '今晚 20:00',
+  'action.snoozeMorning': '明早 9:00',
+  'action.snoozedToast': '已推迟到 {time}',
+
+  // ---------------- 确认框 ----------------
+  'confirm.title': '确认操作',
+  'confirm.ok': '确定',
+  'confirm.cancel': '取消',
+  'confirm.hardDeleteTitle': '彻底删除这条任务？',
+  'confirm.hardDeleteText': '删除后无法恢复。这条任务和它的通知记录会一起消失。',
+  'confirm.hardDeleteOk': '彻底删除',
+  'confirm.hardDeletedToast': '已彻底删除',
+  'confirm.purgeTitle': '清空 {count} 条已归档任务？',
+  'confirm.purgeText': '这些任务会被永久删除，无法恢复。正在处理、已接手和已完成的任务都不受影响。',
+  'confirm.purgeOk': '全部删除',
+  'confirm.purgedToast': '已清空 {count} 条已归档任务',
+
+  // ---------------- 手动添加 ----------------
+  'taskDialog.title': '手动添加任务',
+  'taskDialog.fieldTitle': '标题',
+  'taskDialog.titlePlaceholder': '需要我做什么？',
+  'taskDialog.fieldDetail': '详情（可选）',
+  'taskDialog.detailPlaceholder': '补充上下文',
+  'taskDialog.fieldSeverity': '级别',
+  'taskDialog.fieldProject': '项目',
+  'taskDialog.projectPlaceholder': '可选',
+  'taskDialog.notify': '立即提醒我',
+  'taskDialog.cancel': '取消',
+  'taskDialog.submit': '添加',
+  'taskDialog.addedToast': '已添加',
+
+  // ---------------- 抽屉：设置 ----------------
+  'drawer.rules': '通知规则',
+  'drawer.settings': '设置',
+  'drawer.close': '关闭',
+  'section.status': '状态',
+  'section.account': '账号',
+  'section.tokens': '访问令牌',
+  'section.mcp': 'MCP 接入',
+  'section.users': '用户管理',
+  'section.shortcuts': '快捷键',
+  'section.language': '语言',
+  'section.appearance': '通用',
+
+  'status.notifyPermission': '桌面通知权限',
+  'status.liveConnection': '实时连接',
+  'status.pendingTasks': '待处理任务',
+  'status.username': '用户名',
+  'status.role': '角色',
+  'status.roleAdmin': '管理员',
+  'status.roleUser': '普通用户',
+
+  'perm.granted': '已允许',
+  'perm.denied': '已拒绝',
+  'perm.default': '未设置',
+  'perm.unsupported': '不支持',
+
+  // ---------------- 访问令牌 ----------------
+  'token.hint': 'AI 客户端通过 MCP 推送任务时，需要一枚属于你的访问令牌。凭证必须写在客户端的环境变量 AI_TODO_TOKEN 里，令牌明文只在签发时显示一次。',
+  'token.loadFailed': '令牌列表加载失败：{message}',
+  'token.empty': '还没有签发任何令牌。',
+  'token.lastUsed': '最近使用 {time}',
+  'token.neverUsed': '从未使用',
+  'token.revoked': '已吊销',
+  'token.valid': '有效',
+  'token.revoke': '吊销',
+  'token.revokedToast': '令牌已吊销',
+  'token.namePlaceholder': '令牌名称，如 claude-code',
+  'token.issue': '签发新令牌',
+  'token.issuedToast': '令牌已签发，请立即复制保存',
+  'token.freshLabel': '刚签发的令牌（只显示这一次）',
+  'token.copy': '复制',
+  'token.copiedToast': '已复制',
+  'token.copyFailedToast': '复制失败，请手动选中复制',
+
+  // ---------------- MCP ----------------
+  'mcp.hint': '把下面这段加到你的 AI 客户端（MCode / Claude Code / Cursor）的 MCP 配置里，AI 就能把完成的任务推进来。',
+  'mcp.args': '<你的项目路径>/dist/src/cli.js',
+  'mcp.tokenPlaceholder': '<在上一栏签发一枚令牌后填这里>',
+  'mcp.isolation': '每个用户只会看到自己的任务：令牌决定了任务推给谁。',
+
+  // ---------------- 用户管理 ----------------
+  'user.hint': '管理员可以新建账号、禁用账号。初始密码与访问令牌只显示一次。',
+  'user.loadFailed': '用户列表加载失败：{message}',
+  'user.noUsername': '(无用户名)',
+  'user.flagAdmin': '管理员',
+  'user.flagDisabled': '已禁用',
+  'user.flagNormal': '正常',
+  'user.disable': '禁用',
+  'user.enable': '启用',
+  'user.disabledToast': '账号已禁用',
+  'user.enabledToast': '账号已启用',
+  'user.newUsernamePlaceholder': '新用户名（3–32 位，小写字母/数字/._-）',
+  'user.create': '新建账号',
+  'user.needUsername': '请输入用户名',
+  'user.createdToast': '账号已创建：{username}，初始密码只显示这一次',
+
+  // ---------------- 通知规则 ----------------
+  'rules.loading': '正在加载规则…',
+  'rules.minSeverity': '最低提醒级别',
+  'rules.minSeverityHint': '低于该级别的任务只入库不打扰。',
+  'rules.minSeverityInfo': '全部记录',
+  'rules.minSeverityNeedHuman': '需处理及以上',
+  'rules.minSeverityBlocker': '仅阻塞',
+  'rules.cooldown': '冷却时长（秒）',
+  'rules.cooldownHint': '同一来源在此窗口内的多条任务会合并成一条通知。0 表示不合并。',
+  'rules.groupBy': '合并维度',
+  'rules.groupByHint': '决定哪些任务会被合并。',
+  'rules.groupBySession': '按 AI 会话',
+  'rules.groupByProject': '按项目',
+  'rules.groupByNone': '不合并',
+  'rules.quietHours': '静默时段',
+  'rules.quietHoursHint': '留空表示不静默。跨零点写法如 23:00 → 08:00。',
+  'rules.digestHour': '每日摘要时刻',
+  'rules.digestHourHint': '留空表示不发送摘要。用于兜底，防止漏掉重要事项。',
+  'rules.save': '保存规则',
+  'rules.quietHoursFormat': '静默时段格式应为 HH:MM - HH:MM',
+  'rules.savedToast': '规则已保存',
+
+  // ---------------- 快捷键 ----------------
+  'shortcut.move': '上下选择',
+  'shortcut.ack': '接手',
+  'shortcut.done': '完成',
+  'shortcut.search': '聚焦搜索',
+
+  // ---------------- 通知权限操作 ----------------
+  'notify.enabledToast': '已开启桌面通知',
+  'notify.testTitle': 'AI Todo 通知已开启',
+  'notify.testBody': 'AI 完成任务后会这样弹横幅提醒你。',
+
+  // ---------------- 服务端错误（按 code 翻译） ----------------
+  'error.unauthorized': '登录已失效，请重新登录',
+  'error.invalid_credentials': '用户名或密码不正确',
+  'error.invalid_argument': '参数不合法',
+  'error.invalid_argument.enum': '参数 {param} 取值非法：{value}；可选值 {allowed}',
+  'error.invalid_argument.uuid': '路径参数 {param} 不是合法的 UUID：{value}',
+  'error.forbidden': '权限不足',
+  'error.not_found': '找不到请求的资源',
+  'error.task_not_found': '任务不存在',
+  'error.task_not_archived': '这条任务还没归档，不能彻底删除',
+  'error.token_not_found': '令牌不存在',
+  'error.user_not_found': '用户不存在',
+};

@@ -15,14 +15,40 @@
 <!-- 登录 -->
 <div id="login" class="login-screen" hidden>
   <form class="login-card" id="login-form">
+    <!-- 登录页也要能切语言：不然英文系统环境的人连登录都进不去 -->
+    <button type="button" class="login-locale" id="login-locale" data-i18n-title="topbar.language" data-i18n-aria-label="topbar.language">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+    </button>
     <div class="login-mark" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </div>
-    <h1>登录 AI Todo</h1>
-    <p class="login-hint">用你的账号登录。管理员账号的初始密码见 <code>data/admin-credentials.txt</code>。</p>
-    <input id="login-username" type="text" placeholder="用户名" autocomplete="username" spellcheck="false" autocapitalize="off" required>
-    <input id="login-password" type="password" placeholder="密码" autocomplete="current-password" required>
-    <button type="submit" class="btn btn-primary btn-block">进入</button>
+    <h1 data-i18n="login.title"></h1>
+    <p class="login-hint"><span data-i18n="login.hint"></span> <code data-i18n="login.hintFile"></code></p>
+
+    <div class="field">
+      <label class="field-label" for="login-username" data-i18n="login.username"></label>
+      <div class="field-box">
+        <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <input id="login-username" class="input" type="text" autocomplete="username" spellcheck="false" autocapitalize="off" required data-i18n-placeholder="login.usernamePlaceholder">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="login-password" data-i18n="login.password"></label>
+      <div class="field-box">
+        <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input id="login-password" class="input" type="password" autocomplete="current-password" required data-i18n-placeholder="login.passwordPlaceholder">
+        <button type="button" class="field-toggle" id="login-password-toggle" aria-pressed="false" data-i18n-aria-label="login.showPassword" data-i18n-title="login.showPassword">
+          <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block login-submit" id="login-submit">
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="btn-label" data-i18n="login.submit"></span>
+    </button>
     <p class="login-error" id="login-error" hidden></p>
   </form>
 </div>
@@ -38,11 +64,11 @@
       <span class="pending-pill" id="pending-pill" hidden>0</span>
     </div>
     <div class="topbar-right">
-      <span class="live-dot" id="live-dot" data-state="connecting" title="实时连接状态"><i></i><span id="live-text">连接中</span></span>
+      <span class="live-dot" id="live-dot" data-state="connecting" data-i18n-title="topbar.liveStatus"><i></i><span id="live-text" data-i18n="topbar.connecting"></span></span>
 
       <!-- 当前用户：点开可看账号信息、账号与令牌、退出登录 -->
       <div class="user-menu" id="user-menu">
-        <button class="user-chip" id="btn-user" aria-haspopup="menu" aria-expanded="false" title="当前账号" hidden>
+        <button class="user-chip" id="btn-user" aria-haspopup="menu" aria-expanded="false" hidden data-i18n-title="topbar.currentAccount">
           <span class="avatar" id="user-avatar" aria-hidden="true">·</span>
           <span class="user-name" id="user-name"></span>
           <svg class="user-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -54,19 +80,22 @@
           </div>
           <button class="user-menu-item" id="dd-account" role="menuitem">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span>账号与令牌</span>
+            <span data-i18n="topbar.accountTokens"></span>
           </button>
           <button class="user-menu-item is-danger" id="dd-logout" role="menuitem">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
-            <span>退出登录</span>
+            <span data-i18n="topbar.logout"></span>
           </button>
         </div>
       </div>
 
-      <button class="icon-btn" id="btn-rules" title="通知规则">
+      <button class="icon-btn" id="btn-locale" data-i18n-title="topbar.language">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-rules" data-i18n-title="topbar.rules">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
-      <button class="icon-btn" id="btn-settings" title="设置">
+      <button class="icon-btn" id="btn-settings" data-i18n-title="topbar.settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
       </button>
     </div>
@@ -75,9 +104,9 @@
   <!-- 通知权限提示 -->
   <div class="banner" id="notify-banner" hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-    <span id="notify-banner-text">开启桌面通知，AI 完成任务时立刻弹横幅提醒。</span>
-    <button class="btn btn-sm btn-primary" id="btn-enable-notify">开启通知</button>
-    <button class="icon-btn icon-btn-sm" id="btn-dismiss-banner" aria-label="关闭">
+    <span id="notify-banner-text" data-i18n="banner.enable"></span>
+    <button class="btn btn-sm btn-primary" id="btn-enable-notify" data-i18n="banner.enableBtn"></button>
+    <button class="icon-btn icon-btn-sm" id="btn-dismiss-banner" data-i18n-aria-label="banner.close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>
@@ -85,20 +114,20 @@
   <!-- 工具栏 -->
   <div class="toolbar">
     <div class="tabs" id="tabs">
-      <button class="tab is-active" data-status="pending">待处理</button>
-      <button class="tab" data-status="acked">已接手</button>
-      <button class="tab" data-status="done">已完成</button>
-      <button class="tab" data-status="all">全部</button>
+      <button class="tab is-active" data-status="pending" data-i18n="tab.pending"></button>
+      <button class="tab" data-status="acked" data-i18n="tab.acked"></button>
+      <button class="tab" data-status="done" data-i18n="tab.done"></button>
+      <button class="tab" data-status="all" data-i18n="tab.all"></button>
     </div>
     <div class="toolbar-right">
-      <button class="btn btn-sm btn-quiet btn-danger" id="btn-clear-archived" hidden>清空已归档</button>
-      <select class="select" id="filter-severity" aria-label="按级别筛选">
-        <option value="">全部级别</option>
-        <option value="blocker">阻塞</option>
-        <option value="need_human">需处理</option>
-        <option value="info">记录</option>
+      <button class="btn btn-sm btn-quiet btn-danger" id="btn-clear-archived" hidden data-i18n="toolbar.clearArchived"></button>
+      <select class="select" id="filter-severity" data-i18n-aria-label="toolbar.filterSeverity">
+        <option value="" data-i18n="toolbar.allSeverities"></option>
+        <option value="blocker" data-i18n="severity.blocker"></option>
+        <option value="need_human" data-i18n="severity.need_human"></option>
+        <option value="info" data-i18n="severity.info"></option>
       </select>
-      <input class="input" id="filter-q" type="search" placeholder="搜索…" aria-label="搜索任务">
+      <input class="input" id="filter-q" type="search" data-i18n-placeholder="toolbar.searchPlaceholder" data-i18n-aria-label="toolbar.searchLabel">
     </div>
   </div>
 
@@ -109,23 +138,23 @@
       <div class="empty-mark">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       </div>
-      <p class="empty-title">这里很安静</p>
-      <p class="empty-sub">AI 完成任务后会通过 MCP 把需要你关注的事项推到这里。</p>
+      <p class="empty-title" data-i18n="empty.title"></p>
+      <p class="empty-sub" data-i18n="empty.sub"></p>
     </div>
   </main>
 
   <!-- 新增任务（手动） -->
-  <button class="fab" id="btn-add" title="手动添加任务">
+  <button class="fab" id="btn-add" data-i18n-title="task.addTitle">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
 </div>
 
 <!-- 侧栏：规则 / 设置 -->
 <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-<aside class="drawer" id="drawer" hidden aria-label="设置">
+<aside class="drawer" id="drawer" hidden data-i18n-aria-label="drawer.settings">
   <div class="drawer-head">
-    <h2 id="drawer-title">通知规则</h2>
-    <button class="icon-btn" id="btn-close-drawer" aria-label="关闭">
+    <h2 id="drawer-title" data-i18n="drawer.rules"></h2>
+    <button class="icon-btn" id="btn-close-drawer" data-i18n-aria-label="drawer.close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>
@@ -135,36 +164,36 @@
 <!-- 新增任务对话框 -->
 <dialog class="dialog" id="task-dialog">
   <form method="dialog" class="dialog-inner" id="task-form">
-    <h2>手动添加任务</h2>
+    <h2 data-i18n="taskDialog.title"></h2>
     <label class="field">
-      <span>标题</span>
-      <input class="input" id="new-title" required maxlength="200" placeholder="需要我做什么？">
+      <span data-i18n="taskDialog.fieldTitle"></span>
+      <input class="input" id="new-title" required maxlength="200" data-i18n-placeholder="taskDialog.titlePlaceholder">
     </label>
     <label class="field">
-      <span>详情（可选）</span>
-      <textarea class="input" id="new-detail" rows="3" maxlength="8000" placeholder="补充上下文"></textarea>
+      <span data-i18n="taskDialog.fieldDetail"></span>
+      <textarea class="input" id="new-detail" rows="3" maxlength="8000" data-i18n-placeholder="taskDialog.detailPlaceholder"></textarea>
     </label>
     <div class="field-row">
       <label class="field">
-        <span>级别</span>
+        <span data-i18n="taskDialog.fieldSeverity"></span>
         <select class="select" id="new-severity">
-          <option value="need_human">需处理</option>
-          <option value="blocker">阻塞</option>
-          <option value="info">记录</option>
+          <option value="need_human" data-i18n="severity.need_human"></option>
+          <option value="blocker" data-i18n="severity.blocker"></option>
+          <option value="info" data-i18n="severity.info"></option>
         </select>
       </label>
       <label class="field">
-        <span>项目</span>
-        <input class="input" id="new-project" maxlength="120" placeholder="可选">
+        <span data-i18n="taskDialog.fieldProject"></span>
+        <input class="input" id="new-project" maxlength="120" data-i18n-placeholder="taskDialog.projectPlaceholder">
       </label>
     </div>
     <label class="check">
       <input type="checkbox" id="new-notify" checked>
-      <span>立即提醒我</span>
+      <span data-i18n="taskDialog.notify"></span>
     </label>
     <div class="dialog-actions">
-      <button class="btn" value="cancel" type="submit" formnovalidate>取消</button>
-      <button class="btn btn-primary" id="new-submit" value="ok" type="submit">添加</button>
+      <button class="btn" value="cancel" type="submit" formnovalidate data-i18n="confirm.cancel"></button>
+      <button class="btn btn-primary" id="new-submit" value="ok" type="submit" data-i18n="taskDialog.submit"></button>
     </div>
   </form>
 </dialog>
@@ -172,16 +201,27 @@
 <!-- 通用确认框：不可逆动作的二次确认 -->
 <dialog class="dialog" id="confirm-dialog">
   <form method="dialog" class="dialog-inner" id="confirm-form">
-    <h2 id="confirm-title">确认操作</h2>
+    <h2 id="confirm-title" data-i18n="confirm.title"></h2>
     <p class="dialog-note" id="confirm-text"></p>
     <div class="dialog-actions">
-      <button class="btn" value="cancel" type="submit" formnovalidate>取消</button>
-      <button class="btn btn-danger-solid" id="confirm-ok" value="ok" type="submit">确定</button>
+      <button class="btn" value="cancel" type="submit" formnovalidate data-i18n="confirm.cancel"></button>
+      <button class="btn btn-danger-solid" id="confirm-ok" value="ok" type="submit" data-i18n="confirm.ok"></button>
     </div>
   </form>
 </dialog>
 
 <div class="toast-wrap" id="toast-wrap"></div>
+
+<!--
+  首屏定语言并套用静态文案，避免先闪一下另一种语言。
+  必须放在 body 末尾：模块脚本在 DOM 解析完成后才执行，
+  放在 head 里的话那时 body 还没建出来，要翻译的节点一个都找不到。
+  与 app.js 共用同一个 i18n 模块实例（浏览器按 URL 去重）。
+-->
+<script type="module">
+  import { initLocale } from '/i18n.js';
+  initLocale();
+</script>
 
 <script src="/app.js" type="module"></script>
 </body>

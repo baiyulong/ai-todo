@@ -82,6 +82,10 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   display: grid;
   place-items: center;
   padding: 24px;
+  /* 背后两团柔光，免得大面积纯色发死 */
+  background:
+    radial-gradient(880px 460px at 50% -10%, var(--accent-soft), transparent 70%),
+    var(--bg);
 }
 
 .login-card {
@@ -90,9 +94,20 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  padding: 30px 28px;
+  box-shadow: var(--shadow-lg);
+  padding: 32px 28px 26px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 卡片顶部一条渐变细线 */
+.login-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 30%, transparent));
 }
 
 .login-mark {
@@ -116,25 +131,140 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 .login-hint {
-  margin: 0 0 20px;
-  font-size: 13px;
+  margin: 0 0 22px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .login-hint code {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11.5px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 1px 5px;
 }
 
-.login-card .input { text-align: center; font-family: var(--mono); font-size: 13px; }
+/* 登录卡片右上角的语言切换 */
+.login-locale {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.login-locale:hover { background: var(--surface-2); color: var(--text); }
+.login-locale:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.login-locale svg { width: 16px; height: 16px; }
+
+/* ---------------- 登录表单字段 ---------------- */
+
+.login-card .field { margin-bottom: 14px; text-align: left; }
+
+.field-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.field-box { position: relative; }
+
+.field-box .input {
+  height: 42px;
+  padding: 0 40px 0 38px;
+  font-size: 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.field-box .input::placeholder { color: var(--muted); }
+.field-box .input:hover { border-color: var(--muted); }
+.field-box .input:focus { background: var(--surface); }
+
+.field-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  color: var(--muted);
+  pointer-events: none;
+  transition: color 0.15s ease;
+}
+.field-box:focus-within .field-icon { color: var(--accent); }
+
+/* 密码显示 / 隐藏 */
+.field-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.field-toggle:hover { background: var(--surface); color: var(--text); }
+.field-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.field-toggle svg { width: 16px; height: 16px; }
+.field-toggle .eye-closed { display: none; }
+.field-toggle.is-visible .eye-open { display: none; }
+.field-toggle.is-visible .eye-closed { display: block; }
+
+/* ---------------- 登录提交 ---------------- */
+
+.login-card .login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  margin-top: 22px;
+  font-size: 14px;
+}
+
+.login-submit .spinner {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.login-submit.is-loading .spinner { display: block; }
+@media (prefers-color-scheme: dark) {
+  /* 暗色下主按钮是深色字，转圈也得跟着变深 */
+  .login-submit .spinner {
+    border-color: rgba(16, 32, 27, 0.35);
+    border-top-color: #10201b;
+  }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .login-error {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
+  padding: 9px 12px;
   font-size: 13px;
   color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: 9px;
+  text-align: left;
 }
 
 /* ---------------- 通用控件 ---------------- */
@@ -154,6 +284,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .btn:hover { background: var(--surface-2); border-color: var(--muted); }
 .btn:active { transform: translateY(0.5px); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn:disabled:active { transform: none; }
 
 .btn-primary {
   background: var(--accent);

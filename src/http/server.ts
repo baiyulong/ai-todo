@@ -31,7 +31,7 @@ function parseEnumFilter(
   raw: string | undefined,
   allowed: readonly string[],
   field: string,
-): { values: string[]; error?: { error: { code: string; message: string } } } {
+): { values: string[]; error?: { error: { code: string; message: string; details?: unknown } } } {
   if (!raw) return { values: [] };
   const values = raw
     .split(',')
@@ -45,6 +45,8 @@ function parseEnumFilter(
         error: {
           code: 'invalid_argument',
           message: `参数 ${field} 取值非法：${bad.join(', ')}；可选值 ${allowed.join(', ')}`,
+          // 结构化详情：界面按它翻译成当前语言，不依赖这里的中文 message
+          details: { kind: 'enum', param: field, value: bad.join(', '), allowed: allowed.join(', ') },
         },
       },
     };
@@ -161,7 +163,11 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     if (id === undefined) return;
     if (!z.string().uuid().safeParse(id).success) {
       return reply.code(400).send({
-        error: { code: 'invalid_argument', message: `路径参数 id 不是合法的 UUID：${id}` },
+        error: {
+          code: 'invalid_argument',
+          message: `路径参数 id 不是合法的 UUID：${id}`,
+          details: { kind: 'uuid', param: 'id', value: id },
+        },
       });
     }
   };

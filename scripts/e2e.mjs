@@ -27,7 +27,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.AI_TODO_BASE_URL || 'http://127.0.0.1:8787';
@@ -60,6 +60,11 @@ function stripJsComments(src) {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, ' ') // 块注释
     .replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1'); // 行注释（避开 http:// 这类）
+}
+
+/** 去掉 HTML 注释，理由同上：注释里的中文是给人看的，不算界面文案 */
+function stripHtmlComments(src) {
+  return src.replace(/<!--[\s\S]*?-->/g, ' ');
 }
 
 /* --------------------------------------------------------------- 凭据读取 */
@@ -196,6 +201,96 @@ async function main() {
     'dialog 表单的提交判定使用了 event.submitter',
     /addEventListener\('submit'[\s\S]{0,300}e\.submitter/.test(appJs),
     '缺少 submitter 判断时无法区分「添加」与「取消」',
+  );
+
+  // 登录表单的输入框必须带 class="input"。
+  // 少带这个类，.input 的边框、内边距、圆角、焦点光环整套都不生效，
+  // 页面会悄悄退回浏览器默认样式——这种缺陷 API 层测试全都够不着。
+  const indexHtml = readFileSync(join(root, 'web', 'index.html'), 'utf8');
+  for (const fieldId of ['login-username', 'login-password']) {
+    const tag = indexHtml.match(new RegExp(`<input[^>]*id="${fieldId}"[^>]*>`));
+    check(
+      `登录输入框 ${fieldId} 带 class="input"`,
+      !!tag && /\bclass="[^"]*\binput\b/.test(tag[0]),
+      '缺少 class="input" 会让整套输入框样式失效，界面退回浏览器默认样式',
+    );
+  }
+
+  // 登录页必须从文档里「摘掉」，而不是只 hidden。
+  // 登录表单里有 password 输入框：它只要还挂在文档里，浏览器工具读到
+  // 「容器里含密码框」就会判定需要人工接管认证，把当前会话所有工具（含终端）一起锁死，
+  // 只能靠新开一轮对话恢复。摘出文档这颗雷就拆了。
+  check(
+    '登录页是从文档里摘掉的，而不是只切换 hidden',
+    !/\$\('login'\)\s*\.\s*hidden/.test(appJs) && /loginScreen\.remove\(\)/.test(appJs),
+    '登录表单留在 DOM 里会让浏览器工具反复触发「认证接管」闸门，整个会话的工具被锁死',
+  );
+
+  /* ---------------------------------------------------- i18n 静态检查 */
+
+  // 两个语言包的键必须完全对齐：少一个键，切到那个语言就会露出键名本身。
+  const zh = (await import(pathToFileURL(join(root, 'web', 'locales', 'zh-CN.js')).href)).dict;
+  const en = (await import(pathToFileURL(join(root, 'web', 'locales', 'en-US.js')).href)).dict;
+  const onlyZh = Object.keys(zh).filter((k) => !(k in en));
+  const onlyEn = Object.keys(en).filter((k) => !(k in zh));
+  check(
+    '两个语言包的键集完全一致',
+    onlyZh.length === 0 && onlyEn.length === 0,
+    `中文独有：${onlyZh.join(', ') || '无'}；英文独有：${onlyEn.join(', ') || '无'}`,
+  );
+
+  // 静态文案必须挂 data-i18n，否则切语言后它还是原来那语言。
+  const html = stripHtmlComments(indexHtml);
+  const bareCn = [...html.matchAll(/>([^<>]*[一-龥][^<>]*)</g)]
+    .map((m) => m[1].trim())
+    .filter(Boolean);
+  check(
+    'index.html 里没有裸露的中文文案',
+    bareCn.length === 0,
+    `这些文字没挂 data-i18n：${bareCn.slice(0, 3).join(' / ')}`,
+  );
+
+  // 引用到的键必须真实存在，缺了就会在界面上直接显示键名。
+  const htmlKeys = new Set(
+    [...html.matchAll(/data-i18n(?:-placeholder|-title|-aria-label)?="([^"]+)"/g)].map((m) => m[1]),
+  );
+  const missingHtmlKeys = [...htmlKeys].filter((k) => !(k in zh) || !(k in en));
+  check(
+    'index.html 引用的翻译键在语言包里都存在',
+    missingHtmlKeys.length === 0,
+    `缺失：${missingHtmlKeys.join(', ')}`,
+  );
+
+  // 动态文案同理：app.js 里不许再硬编码中文。
+  const appCode = stripJsComments(readFileSync(join(root, 'web', 'app.js'), 'utf8'));
+  const cnInCode = appCode
+    .split('\n')
+    .map((line, i) => ({ line: line.trim(), no: i + 1 }))
+    .filter((x) => /[一-龥]/.test(x.line));
+  check(
+    'app.js 里没有硬编码的中文文案',
+    cnInCode.length === 0,
+    `第 ${cnInCode.slice(0, 3).map((x) => x.no).join(', ')} 行还有中文`,
+  );
+
+  const appKeys = new Set([...appCode.matchAll(/\bt\('([A-Za-z0-9_.]+)'/g)].map((m) => m[1]));
+  const missingAppKeys = [...appKeys].filter((k) => !(k in zh) || !(k in en));
+  check(
+    'app.js 里 t() 用到的翻译键都存在',
+    missingAppKeys.length === 0,
+    `缺失：${missingAppKeys.join(', ')}`,
+  );
+
+  // 级别与状态标签是动态拼键（severity.${v}），静态扫不到，得单独盯。
+  const enumKeys = [
+    'severity.info', 'severity.need_human', 'severity.blocker',
+    'status.pending', 'status.acked', 'status.done', 'status.archived',
+  ];
+  const missingEnumKeys = enumKeys.filter((k) => !(k in zh) || !(k in en));
+  check(
+    '级别与状态标签的翻译键齐全',
+    missingEnumKeys.length === 0,
+    `缺失：${missingEnumKeys.join(', ')}`,
   );
 
   /* 2. 登录 */

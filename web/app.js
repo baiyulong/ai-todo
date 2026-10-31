@@ -1,5 +1,7 @@
 /* AI Todo · 桌面 Web 前端（配置 A：浏览器系统级通知 + 未读列表） */
 
+import { t, setLocale, getLocale, applyI18n, LOCALES } from './i18n.js';
+
 const state = {
   tasks: [],
   status: 'pending',
@@ -23,13 +25,28 @@ const api = {
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: 'same-origin',
     });
-    if (res.status === 401) {
-      showLogin();
-      throw new Error('unauthorized');
-    }
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
-    if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = null; // 非 JSON 的错误页，按状态码兜底
+      }
+    }
+    if (!res.ok) {
+      const err = new Error(data?.error?.message || `HTTP ${res.status}`);
+      // 把服务端的错误码带出来：界面按 code 翻译，不依赖服务端文案。
+      // 401 也要带 code——登录接口的错误密码正是 401，
+      // 早先在这里直接抛 'unauthorized'，界面只能显示一个英文单词。
+      err.code = data?.error?.code || '';
+      err.details = data?.error?.details || null;
+      if (res.status === 401) {
+        err.code = err.code || 'unauthorized';
+        showLogin();
+      }
+      throw err;
+    }
     return data;
   },
   get(p) { return api.call('GET', p); },
@@ -38,6 +55,29 @@ const api = {
   put(p, b) { return api.call('PUT', p, b); },
   del(p) { return api.call('DELETE', p); },
 };
+
+/**
+ * 把服务端错误翻成当前语言的文案。
+ *
+ * 服务端给的是稳定的 error code + 中文 message；界面按 code 查字典，
+ * 查不到才退回服务端 message（至少不会显示成一串错误码）。
+ */
+function translateError(err) {
+  if (!err) return '';
+  const code = err.code;
+  if (code) {
+    if (code === 'invalid_argument' && err.details?.kind === 'enum') {
+      return t('error.invalid_argument.enum', err.details);
+    }
+    if (code === 'invalid_argument' && err.details?.kind === 'uuid') {
+      return t('error.invalid_argument.uuid', err.details);
+    }
+    const key = `error.${code}`;
+    const translated = t(key);
+    if (translated !== key) return translated;
+  }
+  return err.message || '';
+}
 
 /* ---------------------------------------------------------------- 提示 */
 
@@ -67,7 +107,7 @@ function renderUser() {
   $('user-name').textContent = name;
   $('user-avatar').textContent = name.slice(0, 1);
   $('dd-name').textContent = name;
-  $('dd-role').textContent = me.is_admin ? '管理员' : '普通用户';
+  $('dd-role').textContent = me.is_admin ? t('status.roleAdmin') : t('status.roleUser');
 }
 
 function setUserMenu(open) {
@@ -107,43 +147,108 @@ document.addEventListener('click', (e) => {
 
 /* ---------------------------------------------------------------- 登录 */
 
+/**
+ * 登录页整个从文档里摘掉，而不是只 hidden。
+ *
+ * 原因：登录表单里有 password 输入框。浏览器工具一旦读到「容器里含密码框」，
+ * 就会判定需要人工接管认证，把当前会话的所有工具（含终端）一起锁死，
+ * 只能靠新开一轮对话恢复。把它从文档里摘掉，这颗雷就拆了。
+ *
+ * 元素对象本身留着——所有事件监听器都挂在它身上，摘下来并不会丢；
+ * 退出登录时再按原位插回去即可（用注释节点当锚点，保证回到原来的位置）。
+ */
+const loginScreen = $('login');
+const loginAnchor = document.createComment('login-screen');
+loginScreen.parentNode.insertBefore(loginAnchor, loginScreen);
+
+function detachLogin() {
+  if (loginScreen.isConnected) loginScreen.remove();
+}
+
+function attachLogin() {
+  if (!loginScreen.isConnected) {
+    loginAnchor.parentNode.insertBefore(loginScreen, loginAnchor);
+  }
+}
+
+/** 从登录态切进主界面：登录页顺手从文档里摘掉。 */
+function enterApp() {
+  loginScreen.hidden = true;
+  detachLogin();
+  $('app').hidden = false;
+}
+
 function showLogin() {
-  $('login').hidden = false;
+  attachLogin();
+  loginScreen.hidden = false;
   $('app').hidden = true;
+  // 摘掉的这段时间里语言可能变过，插回来要重新套一遍静态文案
+  applyI18n(loginScreen);
   if (state.es) { state.es.close(); state.es = null; }
   closeUserMenu();
-  setLive('down', '未登录');
+  setLive('down', t('topbar.offline'));
 }
 
 async function tryLogin() {
   try {
     await api.get('/api/v1/me');
-    $('login').hidden = true;
-    $('app').hidden = false;
+    enterApp();
     await bootstrap();
   } catch {
     /* 401 已在 showLogin 处理 */
   }
 }
 
+// 密码框的显示 / 隐藏切换
+$('login-password-toggle').addEventListener('click', () => {
+  const input = $('login-password');
+  const btn = $('login-password-toggle');
+  const shown = input.type === 'text';
+  input.type = shown ? 'password' : 'text';
+  btn.classList.toggle('is-visible', !shown);
+  btn.setAttribute('aria-pressed', String(!shown));
+  const label = shown ? t('login.showPassword') : t('login.hidePassword');
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  input.focus();
+});
+
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const username = $('login-username').value.trim();
   const password = $('login-password').value;
   const err = $('login-error');
+  const submit = $('login-submit');
   err.hidden = true;
+  // 提交期间锁住按钮：避免重复点击打多次登录请求
+  submit.disabled = true;
+  submit.classList.add('is-loading');
   try {
     await api.post('/api/v1/auth/login', { username, password });
     $('login-password').value = '';
-    $('login').hidden = true;
-    $('app').hidden = false;
+    $('login-password').type = 'password';
+    $('login-password-toggle').classList.remove('is-visible');
+    $('login-password-toggle').setAttribute('aria-pressed', 'false');
+    $('login-password-toggle').setAttribute('aria-label', t('login.showPassword'));
+    $('login-password-toggle').title = t('login.showPassword');
+    enterApp();
     await bootstrap();
   } catch (err2) {
-    err.textContent =
-      err2.message === 'unauthorized' || err2.message === '用户名或密码不正确'
-        ? '用户名或密码不正确'
-        : err2.message;
-    err.hidden = false;
+    const msg =
+      err2.code === 'unauthorized' || err2.code === 'invalid_credentials'
+        ? t('login.invalidCredentials')
+        : translateError(err2);
+    // 登录页还挂在文档里 → 错误显示在表单下方（密码错误就是这种情况）；
+    // 已经摘掉了 → 说明是登录成功后的初始化出错，改用全局提示
+    if (loginScreen.isConnected) {
+      err.textContent = msg;
+      err.hidden = false;
+    } else {
+      toast(msg, true);
+    }
+  } finally {
+    submit.disabled = false;
+    submit.classList.remove('is-loading');
   }
 });
 
@@ -185,7 +290,7 @@ function updateClearArchivedButton() {
   if (!btn || !state.me) return;
   const n = state.me.archived ?? 0;
   btn.hidden = n <= 0;
-  btn.textContent = n > 0 ? `清空已归档（${n}）` : '清空已归档';
+  btn.textContent = n > 0 ? t('toolbar.clearArchivedCount', { count: n }) : t('toolbar.clearArchived');
 }
 
 async function loadTasks() {
@@ -199,7 +304,7 @@ async function loadTasks() {
     state.tasks = tasks || [];
     renderTasks();
   } catch (err) {
-    if (err.message !== 'unauthorized') toast(err.message, true);
+    if (err.code !== 'unauthorized') toast(translateError(err), true);
   }
 }
 
@@ -212,8 +317,17 @@ function updatePending(n) {
 
 /* ---------------------------------------------------------------- 渲染 */
 
-const SEV_LABEL = { info: '记录', need_human: '需处理', blocker: '阻塞' };
-const ST_LABEL = { pending: '待处理', acked: '已接手', done: '已完成', archived: '已归档' };
+// 标签跟语言走，所以每次现查字典，不缓存成常量
+function sevLabel(v) {
+  const key = `severity.${v}`;
+  const s = t(key);
+  return s === key ? v : s;
+}
+function stLabel(v) {
+  const key = `status.${v}`;
+  const s = t(key);
+  return s === key ? v : s;
+}
 
 /**
  * 建 SVG 图标。
@@ -285,8 +399,8 @@ function renderTask(task) {
   const del = document.createElement('button');
   del.className = 'task-del' + (isArchived ? ' is-hard' : '');
   del.type = 'button';
-  del.title = isArchived ? '彻底删除（不可恢复）' : '删除（可在「全部」标签里找回）';
-  del.setAttribute('aria-label', isArchived ? '彻底删除任务' : '删除任务');
+  del.title = isArchived ? t('task.hardDeleteTitle') : t('task.deleteTitle');
+  del.setAttribute('aria-label', isArchived ? t('task.hardDeleteLabel') : t('task.deleteLabel'));
   del.appendChild(svgIcon(isArchived ? TRASH_X_ICON : TRASH_ICON));
   del.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -313,13 +427,13 @@ function renderTask(task) {
 
   const sevTag = document.createElement('span');
   sevTag.className = `tag sev-${task.severity}`;
-  sevTag.textContent = SEV_LABEL[task.severity] || task.severity;
+  sevTag.textContent = sevLabel(task.severity);
   meta.appendChild(sevTag);
 
   if (task.status !== 'pending') {
     const stTag = document.createElement('span');
     stTag.className = `tag st-${task.status}`;
-    stTag.textContent = ST_LABEL[task.status] || task.status;
+    stTag.textContent = stLabel(task.status);
     meta.appendChild(stTag);
   }
 
@@ -354,7 +468,7 @@ function renderTask(task) {
     meta.appendChild(sep);
 
     const due = document.createElement('span');
-    due.textContent = `提醒 ${formatTime(task.due_at)}`;
+    due.textContent = t('task.remindAt', { time: formatTime(task.due_at) });
     meta.appendChild(due);
   }
 
@@ -376,13 +490,13 @@ function renderTask(task) {
   actions.className = 'task-actions';
 
   if (task.status === 'pending') {
-    actions.appendChild(actionBtn('接手', 'btn', () => setStatus(task.id, 'ack')));
+    actions.appendChild(actionBtn(t('action.ack'), 'btn', () => setStatus(task.id, 'ack')));
   }
   if (task.status !== 'done' && task.status !== 'archived') {
-    actions.appendChild(actionBtn('完成', 'btn', () => setStatus(task.id, 'done')));
+    actions.appendChild(actionBtn(t('action.done'), 'btn', () => setStatus(task.id, 'done')));
   }
   if (task.status === 'pending') {
-    actions.appendChild(actionBtn('稍后提醒', 'btn', (btn) => toggleSnooze(task, btn)));
+    actions.appendChild(actionBtn(t('action.snooze'), 'btn', (btn) => toggleSnooze(task, btn)));
   }
 
   card.appendChild(actions);
@@ -414,9 +528,9 @@ function toggleSnooze(task, btn) {
   row.className = 'snooze-row task-actions';
 
   const presets = [
-    ['1 小时后', 1],
-    ['今晚 20:00', 'tonight'],
-    ['明早 9:00', 'morning'],
+    [t('action.snooze1h'), 1],
+    [t('action.snoozeTonight'), 'tonight'],
+    [t('action.snoozeMorning'), 'morning'],
   ];
 
   for (const [label, kind] of presets) {
@@ -427,7 +541,7 @@ function toggleSnooze(task, btn) {
       const until = computeSnooze(kind);
       await api.post(`/api/v1/tasks/${task.id}/snooze`, { until: until.toISOString() });
       row.remove();
-      toast(`已推迟到 ${formatTime(until.toISOString())}`);
+      toast(t('action.snoozedToast', { time: formatTime(until.toISOString()) }));
       await loadTasks();
     });
     row.appendChild(b);
@@ -481,7 +595,7 @@ async function setStatus(id, status) {
     await loadTasks();
     await loadMe();
   } catch (err) {
-    toast(err.message, true);
+    toast(translateError(err), true);
   }
 }
 
@@ -493,9 +607,9 @@ async function archiveTask(id) {
     // 必须给反馈：卡片凭空消失、没有提示的话，
     // 在长列表里很容易被当成「没点上」或者「没反应」。
     // 删除提示比默认久一点：它带着「可以去哪儿找回来」的信息，值得看清
-    toast('已删除，可在「全部」标签里找回', false, 5000);
+    toast(t('task.deletedToast'), false, 5000);
   } catch (err) {
-    toast(err.message, true);
+    toast(translateError(err), true);
   }
 }
 
@@ -506,18 +620,18 @@ async function archiveTask(id) {
  */
 async function hardDeleteTask(id) {
   const ok = await confirmAction({
-    title: '彻底删除这条任务？',
-    text: '删除后无法恢复。这条任务和它的通知记录会一起消失。',
-    okLabel: '彻底删除',
+    title: t('confirm.hardDeleteTitle'),
+    text: t('confirm.hardDeleteText'),
+    okLabel: t('confirm.hardDeleteOk'),
   });
   if (!ok) return;
   try {
     await api.del(`/api/v1/tasks/${id}`);
     await loadTasks();
     await loadMe();
-    toast('已彻底删除', false, 2400);
+    toast(t('confirm.hardDeletedToast'), false, 2400);
   } catch (err) {
-    toast(err.message, true);
+    toast(translateError(err), true);
   }
 }
 
@@ -528,12 +642,12 @@ async function hardDeleteTask(id) {
  * （返回 false 或干脆不弹），用户只会看到「点了没反应」——
  * 而这恰恰是不可逆操作最不能接受的失败方式。
  */
-function confirmAction({ title, text, okLabel = '确定' }) {
+function confirmAction({ title, text, okLabel }) {
   return new Promise((resolve) => {
     const dlg = $('confirm-dialog');
     $('confirm-title').textContent = title;
     $('confirm-text').textContent = text;
-    $('confirm-ok').textContent = okLabel;
+    $('confirm-ok').textContent = okLabel || t('confirm.ok');
     dlg.returnValue = '';
     const onClose = () => {
       dlg.removeEventListener('close', onClose);
@@ -558,8 +672,8 @@ function connectStream() {
   const es = new EventSource('/api/v1/stream', { withCredentials: true });
   state.es = es;
 
-  es.onopen = () => setLive('live', '实时');
-  es.onerror = () => setLive('down', '重连中');
+  es.onopen = () => setLive('live', t('topbar.live'));
+  es.onerror = () => setLive('down', t('topbar.reconnecting'));
 
   es.addEventListener('notification', (e) => {
     try {
@@ -649,19 +763,19 @@ function updateNotifyBanner() {
 
   if (!supported) {
     banner.hidden = false;
-    $('notify-banner-text').textContent = '当前浏览器不支持系统通知，将以页内提示代替。';
+    $('notify-banner-text').textContent = t('banner.unsupported');
     $('btn-enable-notify').hidden = true;
     return;
   }
   if (permission === 'granted') { banner.hidden = true; return; }
   if (permission === 'denied') {
     banner.hidden = false;
-    $('notify-banner-text').textContent = '通知权限已被拒绝。请在地址栏左侧的网站设置里允许通知，然后刷新页面。';
+    $('notify-banner-text').textContent = t('banner.denied');
     $('btn-enable-notify').hidden = true;
     return;
   }
   banner.hidden = false;
-  $('notify-banner-text').textContent = '开启桌面通知，AI 完成任务时立刻弹横幅提醒。';
+  $('notify-banner-text').textContent = t('banner.enable');
   $('btn-enable-notify').hidden = false;
 }
 
@@ -670,14 +784,14 @@ $('btn-enable-notify').addEventListener('click', async () => {
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
     updateNotifyBanner();
-    toast('已开启桌面通知');
+    toast(t('notify.enabledToast'));
     await registerServiceWorker();
     // 发一条测试横幅，确认端到端可用
     try {
       const reg = await getActiveRegistration();
       if (reg) {
-        await reg.showNotification('AI Todo 通知已开启', {
-          body: 'AI 完成任务后会这样弹横幅提醒你。',
+        await reg.showNotification(t('notify.testTitle'), {
+          body: t('notify.testBody'),
           tag: 'ai-todo-test',
           icon: '/icon.svg',
         });
@@ -720,18 +834,18 @@ $('btn-clear-archived').addEventListener('click', async () => {
   const n = state.me?.archived ?? 0;
   if (n <= 0) return;
   const ok = await confirmAction({
-    title: `清空 ${n} 条已归档任务？`,
-    text: '这些任务会被永久删除，无法恢复。正在处理、已接手和已完成的任务都不受影响。',
-    okLabel: '全部删除',
+    title: t('confirm.purgeTitle', { count: n }),
+    text: t('confirm.purgeText'),
+    okLabel: t('confirm.purgeOk'),
   });
   if (!ok) return;
   try {
     const r = await api.del('/api/v1/tasks/archived');
     await loadTasks();
     await loadMe();
-    toast(`已清空 ${r.deleted ?? 0} 条已归档任务`, false, 3000);
+    toast(t('confirm.purgedToast', { count: r.deleted ?? 0 }), false, 3000);
   } catch (err) {
-    toast(err.message, true);
+    toast(translateError(err), true);
   }
 });
 
@@ -776,9 +890,9 @@ $('task-form').addEventListener('submit', async (e) => {
     await api.post('/api/v1/tasks', payload);
     await loadTasks();
     await loadMe();
-    toast('已添加');
+    toast(t('taskDialog.addedToast'));
   } catch (err) {
-    toast(err.message, true);
+    toast(translateError(err), true);
   }
 });
 
@@ -802,6 +916,29 @@ $('btn-settings').addEventListener('click', () => openDrawer('settings'));
 $('btn-close-drawer').addEventListener('click', closeDrawer);
 $('drawer-backdrop').addEventListener('click', closeDrawer);
 
+// 顶栏语言按钮：在已支持的语言之间直接对切
+$('btn-locale').addEventListener('click', () => {
+  setLocale(getLocale() === 'zh-CN' ? 'en-US' : 'zh-CN');
+});
+
+// 登录页也有一个：不然英文系统环境的人连登录都进不去
+$('login-locale').addEventListener('click', () => {
+  setLocale(getLocale() === 'zh-CN' ? 'en-US' : 'zh-CN');
+});
+
+/**
+ * 语言切换后的重绘。
+ * i18n.js 已经套好了 HTML 上的静态文案，这里负责那些运行时才生成的内容：
+ * 任务卡片、顶栏状态、设置抽屉。
+ */
+window.addEventListener('ai-todo:localechange', () => {
+  renderTasks();
+  renderUser();
+  updateClearArchivedButton();
+  updateNotifyBanner();
+  renderDrawerIfOpen();
+});
+
 function renderDrawerIfOpen() {
   if (state.drawerMode && !$('drawer').hidden) renderDrawer();
 }
@@ -813,22 +950,22 @@ async function renderDrawer() {
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
 
   if (state.drawerMode === 'rules') {
-    $('drawer-title').textContent = '通知规则';
+    $('drawer-title').textContent = t('drawer.rules');
     body.appendChild(rulesForm(rules));
     return;
   }
 
-  $('drawer-title').textContent = '设置';
+  $('drawer-title').textContent = t('drawer.settings');
 
   // 状态
-  const s1 = section('状态');
-  s1.appendChild(statusRow('桌面通知权限', permLabel(perm), permClass(perm)));
-  s1.appendChild(statusRow('实时连接', $('live-text').textContent, $('live-dot').dataset.state === 'live' ? 'ok' : 'bad'));
-  s1.appendChild(statusRow('待处理任务', String(state.me?.pending ?? 0), 'ok'));
+  const s1 = section(t('section.status'));
+  s1.appendChild(statusRow(t('status.notifyPermission'), permLabel(perm), permClass(perm)));
+  s1.appendChild(statusRow(t('status.liveConnection'), $('live-text').textContent, $('live-dot').dataset.state === 'live' ? 'ok' : 'bad'));
+  s1.appendChild(statusRow(t('status.pendingTasks'), String(state.me?.pending ?? 0), 'ok'));
   if (perm === 'default') {
     const btn = document.createElement('button');
     btn.className = 'btn btn-sm btn-primary';
-    btn.textContent = '开启通知';
+    btn.textContent = t('banner.enableBtn');
     btn.style.marginTop = '10px';
     btn.addEventListener('click', () => $('btn-enable-notify').click());
     s1.appendChild(btn);
@@ -836,12 +973,12 @@ async function renderDrawer() {
   body.appendChild(s1);
 
   // 账号
-  const s2 = section('账号');
-  s2.appendChild(statusRow('用户名', state.me?.username ?? '—', 'ok'));
-  s2.appendChild(statusRow('角色', state.me?.is_admin ? '管理员' : '普通用户', state.me?.is_admin ? 'ok' : ''));
+  const s2 = section(t('section.account'));
+  s2.appendChild(statusRow(t('status.username'), state.me?.username ?? '—', 'ok'));
+  s2.appendChild(statusRow(t('status.role'), state.me?.is_admin ? t('status.roleAdmin') : t('status.roleUser'), state.me?.is_admin ? 'ok' : ''));
   const logout = document.createElement('button');
   logout.className = 'btn btn-block';
-  logout.textContent = '退出登录';
+  logout.textContent = t('topbar.logout');
   logout.style.marginTop = '10px';
   logout.addEventListener('click', () => {
     doLogout();
@@ -849,48 +986,62 @@ async function renderDrawer() {
   s2.appendChild(logout);
   body.appendChild(s2);
 
+  // 语言
+  const s2b = section(t('section.language'));
+  for (const [code, meta] of Object.entries(LOCALES)) {
+    const b = document.createElement('button');
+    b.className = 'btn btn-sm' + (getLocale() === code ? ' btn-primary' : '');
+    b.textContent = meta.label;
+    b.style.marginRight = '8px';
+    b.addEventListener('click', () => {
+      setLocale(code);
+    });
+    s2b.appendChild(b);
+  }
+  body.appendChild(s2b);
+
   // 访问令牌（AI 客户端用）
-  const s3 = section('访问令牌');
-  s3.appendChild(hint('AI 客户端通过 MCP 推送任务时，需要一枚属于你的访问令牌。凭证必须写在客户端的环境变量 AI_TODO_TOKEN 里，令牌明文只在签发时显示一次。'));
+  const s3 = section(t('section.tokens'));
+  s3.appendChild(hint(t('token.hint')));
   body.appendChild(s3);
   body.appendChild(await tokensBlock());
 
   // MCP 接入
-  const s4 = section('MCP 接入');
-  s4.appendChild(hint('把下面这段加到你的 AI 客户端（MCode / Claude Code / Cursor）的 MCP 配置里，AI 就能把完成的任务推进来。'));
+  const s4 = section(t('section.mcp'));
+  s4.appendChild(hint(t('mcp.hint')));
   const pre = document.createElement('pre');
   pre.className = 'code-block';
   const cfg = {
     mcpServers: {
       'ai-todo': {
         command: 'node',
-        args: ['<你的项目路径>/dist/src/cli.js', 'mcp'],
+        args: [t('mcp.args'), 'mcp'],
         env: {
           AI_TODO_BASE_URL: location.origin,
-          AI_TODO_TOKEN: state.lastToken || '<在上一栏签发一枚令牌后填这里>',
+          AI_TODO_TOKEN: state.lastToken || t('mcp.tokenPlaceholder'),
         },
       },
     },
   };
   pre.textContent = JSON.stringify(cfg, null, 2);
   s4.appendChild(pre);
-  s4.appendChild(hint('每个用户只会看到自己的任务：令牌决定了任务推给谁。'));
+  s4.appendChild(hint(t('mcp.isolation')));
   body.appendChild(s4);
 
   // 用户管理（仅管理员）
   if (state.me?.is_admin) {
-    const s5 = section('用户管理');
-    s5.appendChild(hint('管理员可以新建账号、禁用账号。初始密码与访问令牌只显示一次。'));
+    const s5 = section(t('section.users'));
+    s5.appendChild(hint(t('user.hint')));
     body.appendChild(s5);
     body.appendChild(await usersBlock());
   }
 
   // 快捷键
-  const s6 = section('快捷键');
-  s6.appendChild(statusRow('j / k', '上下选择'));
-  s6.appendChild(statusRow('a', '接手'));
-  s6.appendChild(statusRow('d', '完成'));
-  s6.appendChild(statusRow('/', '聚焦搜索'));
+  const s6 = section(t('section.shortcuts'));
+  s6.appendChild(statusRow('j / k', t('shortcut.move')));
+  s6.appendChild(statusRow('a', t('shortcut.ack')));
+  s6.appendChild(statusRow('d', t('shortcut.done')));
+  s6.appendChild(statusRow('/', t('shortcut.search')));
   body.appendChild(s6);
 }
 
@@ -904,14 +1055,15 @@ async function tokensBlock() {
     const res = await api.get('/api/v1/tokens');
     tokens = res.tokens || [];
   } catch (err) {
-    frag.appendChild(hint('令牌列表加载失败：' + err.message));
+    frag.appendChild(hint(t('token.loadFailed', { message: translateError(err) })));
     return frag;
   }
 
   if (tokens.length === 0) {
-    frag.appendChild(hint('还没有签发任何令牌。'));
+    frag.appendChild(hint(t('token.empty')));
   } else {
-    for (const t of tokens) {
+    // 循环变量不能叫 t——那是本模块的翻译函数
+    for (const tk of tokens) {
       const row = document.createElement('div');
       row.className = 'token-row';
 
@@ -919,26 +1071,28 @@ async function tokensBlock() {
       info.className = 'token-info';
       const name = document.createElement('div');
       name.className = 'token-name';
-      name.textContent = t.name;
+      name.textContent = tk.name;
       const meta = document.createElement('div');
       meta.className = 'token-meta';
-      const used = t.last_used_at ? `最近使用 ${formatTime(t.last_used_at)}` : '从未使用';
-      meta.textContent = `${t.revoked_at ? '已吊销' : '有效'} · ${used}`;
+      const used = tk.last_used_at
+        ? t('token.lastUsed', { time: formatTime(tk.last_used_at) })
+        : t('token.neverUsed');
+      meta.textContent = `${tk.revoked_at ? t('token.revoked') : t('token.valid')} · ${used}`;
       info.appendChild(name);
       info.appendChild(meta);
       row.appendChild(info);
 
-      if (!t.revoked_at) {
+      if (!tk.revoked_at) {
         const revoke = document.createElement('button');
         revoke.className = 'btn btn-sm btn-quiet btn-danger';
-        revoke.textContent = '吊销';
+        revoke.textContent = t('token.revoke');
         revoke.addEventListener('click', async () => {
           try {
-            await api.del(`/api/v1/tokens/${t.id}`);
-            toast('令牌已吊销');
+            await api.del(`/api/v1/tokens/${tk.id}`);
+            toast(t('token.revokedToast'));
             renderDrawer();
           } catch (err) {
-            toast(err.message, true);
+            toast(translateError(err), true);
           }
         });
         row.appendChild(revoke);
@@ -950,22 +1104,22 @@ async function tokensBlock() {
 
   const nameInput = document.createElement('input');
   nameInput.className = 'input';
-  nameInput.placeholder = '令牌名称，如 claude-code';
+  nameInput.placeholder = t('token.namePlaceholder');
   nameInput.maxLength = 120;
 
   const issue = document.createElement('button');
   issue.className = 'btn btn-primary btn-block';
-  issue.textContent = '签发新令牌';
+  issue.textContent = t('token.issue');
   issue.style.marginTop = '10px';
   issue.addEventListener('click', async () => {
     try {
       const res = await api.post('/api/v1/tokens', { name: nameInput.value.trim() || 'mcp-client' });
       state.lastToken = res.token;
       nameInput.value = '';
-      toast('令牌已签发，请立即复制保存');
+      toast(t('token.issuedToast'));
       renderDrawer();
     } catch (err) {
-      toast(err.message, true);
+      toast(translateError(err), true);
     }
   });
 
@@ -977,18 +1131,18 @@ async function tokensBlock() {
     box.className = 'token-secret';
     const label = document.createElement('div');
     label.className = 'token-secret-label';
-    label.textContent = '刚签发的令牌（只显示这一次）';
+    label.textContent = t('token.freshLabel');
     const code = document.createElement('code');
     code.textContent = state.lastToken;
     const copy = document.createElement('button');
     copy.className = 'btn btn-sm';
-    copy.textContent = '复制';
+    copy.textContent = t('token.copy');
     copy.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(state.lastToken);
-        toast('已复制');
+        toast(t('token.copiedToast'));
       } catch {
-        toast('复制失败，请手动选中复制', true);
+        toast(t('token.copyFailedToast'), true);
       }
     });
     box.appendChild(label);
@@ -1010,7 +1164,7 @@ async function usersBlock() {
     const res = await api.get('/api/v1/admin/users');
     users = res.users || [];
   } catch (err) {
-    frag.appendChild(hint('用户列表加载失败：' + err.message));
+    frag.appendChild(hint(t('user.loadFailed', { message: translateError(err) })));
     return frag;
   }
 
@@ -1022,13 +1176,13 @@ async function usersBlock() {
     info.className = 'token-info';
     const name = document.createElement('div');
     name.className = 'token-name';
-    name.textContent = (u.username || '(无用户名)') + (u.display_name ? ` · ${u.display_name}` : '');
+    name.textContent = (u.username || t('user.noUsername')) + (u.display_name ? ` · ${u.display_name}` : '');
     const meta = document.createElement('div');
     meta.className = 'token-meta';
     const flags = [];
-    if (u.is_admin) flags.push('管理员');
-    if (!u.is_active) flags.push('已禁用');
-    meta.textContent = flags.length ? flags.join(' · ') : '正常';
+    if (u.is_admin) flags.push(t('user.flagAdmin'));
+    if (!u.is_active) flags.push(t('user.flagDisabled'));
+    meta.textContent = flags.length ? flags.join(' · ') : t('user.flagNormal');
     info.appendChild(name);
     info.appendChild(meta);
     row.appendChild(info);
@@ -1036,14 +1190,14 @@ async function usersBlock() {
     const toggle = document.createElement('button');
     // 「禁用」是破坏性动作，悬停时给警示色；「启用」是恢复动作，保持中性
     toggle.className = u.is_active ? 'btn btn-sm btn-quiet btn-danger' : 'btn btn-sm btn-quiet';
-    toggle.textContent = u.is_active ? '禁用' : '启用';
+    toggle.textContent = u.is_active ? t('user.disable') : t('user.enable');
     toggle.addEventListener('click', async () => {
       try {
         await api.patch(`/api/v1/admin/users/${u.id}`, { is_active: !u.is_active });
-        toast(u.is_active ? '账号已禁用' : '账号已启用');
+        toast(u.is_active ? t('user.disabledToast') : t('user.enabledToast'));
         renderDrawer();
       } catch (err) {
-        toast(err.message, true);
+        toast(translateError(err), true);
       }
     });
     row.appendChild(toggle);
@@ -1053,26 +1207,26 @@ async function usersBlock() {
 
   const uname = document.createElement('input');
   uname.className = 'input';
-  uname.placeholder = '新用户名（3–32 位，小写字母/数字/._-）';
+  uname.placeholder = t('user.newUsernamePlaceholder');
   uname.maxLength = 32;
   uname.autocapitalize = 'off';
   uname.spellcheck = false;
 
   const create = document.createElement('button');
   create.className = 'btn btn-primary btn-block';
-  create.textContent = '新建账号';
+  create.textContent = t('user.create');
   create.style.marginTop = '10px';
   create.addEventListener('click', async () => {
     const username = uname.value.trim().toLowerCase();
-    if (!username) { toast('请输入用户名', true); return; }
+    if (!username) { toast(t('user.needUsername'), true); return; }
     try {
       const res = await api.post('/api/v1/admin/users', { username });
       state.lastToken = res.token;
       uname.value = '';
-      toast(`账号已创建：${res.user.username}，初始密码只显示这一次`);
+      toast(t('user.createdToast', { username: res.user.username }));
       renderDrawer();
     } catch (err) {
-      toast(err.message, true);
+      toast(translateError(err), true);
     }
   });
 
@@ -1085,14 +1239,18 @@ async function usersBlock() {
 function rulesForm(rules) {
   const frag = document.createDocumentFragment();
   if (!rules) {
-    frag.appendChild(hint('正在加载规则…'));
+    frag.appendChild(hint(t('rules.loading')));
     return frag;
   }
 
-  const sevField = field('最低提醒级别', '低于该级别的任务只入库不打扰。');
+  const sevField = field(t('rules.minSeverity'), t('rules.minSeverityHint'));
   const sev = document.createElement('select');
   sev.className = 'select';
-  for (const [v, label] of [['info', '全部记录'], ['need_human', '需处理及以上'], ['blocker', '仅阻塞']]) {
+  for (const [v, label] of [
+    ['info', t('rules.minSeverityInfo')],
+    ['need_human', t('rules.minSeverityNeedHuman')],
+    ['blocker', t('rules.minSeverityBlocker')],
+  ]) {
     const o = document.createElement('option');
     o.value = v;
     o.textContent = label;
@@ -1101,7 +1259,7 @@ function rulesForm(rules) {
   }
   sevField.appendChild(sev);
 
-  const cdField = field('冷却时长（秒）', '同一来源在此窗口内的多条任务会合并成一条通知。0 表示不合并。');
+  const cdField = field(t('rules.cooldown'), t('rules.cooldownHint'));
   const cd = document.createElement('input');
   cd.className = 'input';
   cd.type = 'number';
@@ -1110,10 +1268,14 @@ function rulesForm(rules) {
   cd.value = String(rules.cooldown_sec ?? 300);
   cdField.appendChild(cd);
 
-  const grField = field('合并维度', '决定哪些任务会被合并。');
+  const grField = field(t('rules.groupBy'), t('rules.groupByHint'));
   const gr = document.createElement('select');
   gr.className = 'select';
-  for (const [v, label] of [['source_session', '按 AI 会话'], ['project', '按项目'], ['none', '不合并']]) {
+  for (const [v, label] of [
+    ['source_session', t('rules.groupBySession')],
+    ['project', t('rules.groupByProject')],
+    ['none', t('rules.groupByNone')],
+  ]) {
     const o = document.createElement('option');
     o.value = v;
     o.textContent = label;
@@ -1122,14 +1284,14 @@ function rulesForm(rules) {
   }
   grField.appendChild(gr);
 
-  const qhField = field('静默时段', '留空表示不静默。跨零点写法如 23:00 → 08:00。');
+  const qhField = field(t('rules.quietHours'), t('rules.quietHoursHint'));
   const qh = document.createElement('input');
   qh.className = 'input';
   qh.placeholder = '23:00 - 08:00';
   qh.value = rules.quiet_hours ? `${rules.quiet_hours.start} - ${rules.quiet_hours.end}` : '';
   qhField.appendChild(qh);
 
-  const dgField = field('每日摘要时刻', '留空表示不发送摘要。用于兜底，防止漏掉重要事项。');
+  const dgField = field(t('rules.digestHour'), t('rules.digestHourHint'));
   const dg = document.createElement('input');
   dg.className = 'input';
   dg.type = 'number';
@@ -1146,13 +1308,13 @@ function rulesForm(rules) {
 
   const save = document.createElement('button');
   save.className = 'btn btn-primary btn-block';
-  save.textContent = '保存规则';
+  save.textContent = t('rules.save');
   save.addEventListener('click', async () => {
     let quiet = null;
     const qhText = qh.value.trim();
     if (qhText) {
       const m = /^(\d{1,2}:\d{2})\s*[-–~]\s*(\d{1,2}:\d{2})$/.exec(qhText);
-      if (!m) { toast('静默时段格式应为 HH:MM - HH:MM', true); return; }
+      if (!m) { toast(t('rules.quietHoursFormat'), true); return; }
       quiet = { start: m[1], end: m[2] };
     }
     try {
@@ -1164,9 +1326,9 @@ function rulesForm(rules) {
         digest_hour: dg.value === '' ? null : Number(dg.value),
       });
       state.rules = res.rules;
-      toast('规则已保存');
+      toast(t('rules.savedToast'));
     } catch (err) {
-      toast(err.message, true);
+      toast(translateError(err), true);
     }
   });
   frag.appendChild(save);
@@ -1215,7 +1377,13 @@ function statusRow(k, v, cls) {
 }
 
 function permLabel(p) {
-  return { granted: '已允许', denied: '已拒绝', default: '未设置', unsupported: '不支持' }[p] || p;
+  const map = {
+    granted: 'perm.granted',
+    denied: 'perm.denied',
+    default: 'perm.default',
+    unsupported: 'perm.unsupported',
+  };
+  return map[p] ? t(map[p]) : p;
 }
 function permClass(p) {
   return { granted: 'ok', denied: 'bad', default: 'warn', unsupported: 'bad' }[p] || '';

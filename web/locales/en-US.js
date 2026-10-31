@@ -1,0 +1,222 @@
+/* AI Todo · English language pack */
+
+export const dict = {
+  // ---------------- Common ----------------
+  'app.name': 'AI Todo',
+
+  // ---------------- Sign in ----------------
+  'login.title': 'Sign in to AI Todo',
+  'login.hint': 'Sign in with your account. The initial admin password is in',
+  'login.hintFile': 'data/admin-credentials.txt',
+  'login.username': 'Username',
+  'login.usernamePlaceholder': 'Your username',
+  'login.password': 'Password',
+  'login.passwordPlaceholder': 'Enter your password',
+  'login.submit': 'Sign in',
+  'login.showPassword': 'Show password',
+  'login.hidePassword': 'Hide password',
+  'login.invalidCredentials': 'Incorrect username or password',
+
+  // ---------------- Top bar ----------------
+  'topbar.liveStatus': 'Live connection status',
+  'topbar.connecting': 'Connecting',
+  'topbar.live': 'Live',
+  'topbar.reconnecting': 'Reconnecting',
+  'topbar.offline': 'Signed out',
+  'topbar.currentAccount': 'Current account',
+  'topbar.accountTokens': 'Account & tokens',
+  'topbar.logout': 'Sign out',
+  'topbar.rules': 'Notification rules',
+  'topbar.settings': 'Settings',
+  'topbar.language': 'Switch language',
+  'topbar.languageName': 'English',
+
+  // ---------------- Notification permission banner ----------------
+  'banner.enable': 'Turn on desktop notifications so AI can pop a banner the moment it finishes a task.',
+  'banner.enableBtn': 'Turn on',
+  'banner.unsupported': 'This browser does not support system notifications. In-page hints will be used instead.',
+  'banner.denied': 'Notification permission was denied. Allow notifications in the site settings to the left of the address bar, then reload.',
+  'banner.close': 'Close',
+
+  // ---------------- Toolbar ----------------
+  'tab.pending': 'Pending',
+  'tab.acked': 'In progress',
+  'tab.done': 'Done',
+  'tab.all': 'All',
+  'toolbar.clearArchived': 'Clear archived',
+  'toolbar.clearArchivedCount': 'Clear archived ({count})',
+  'toolbar.allSeverities': 'All levels',
+  'toolbar.filterSeverity': 'Filter by level',
+  'toolbar.searchPlaceholder': 'Search…',
+  'toolbar.searchLabel': 'Search tasks',
+
+  // ---------------- Severity / status ----------------
+  'severity.info': 'Note',
+  'severity.need_human': 'Needs you',
+  'severity.blocker': 'Blocking',
+  'status.pending': 'Pending',
+  'status.acked': 'In progress',
+  'status.done': 'Done',
+  'status.archived': 'Archived',
+
+  // ---------------- Empty state ----------------
+  'empty.title': 'All quiet here',
+  'empty.sub': 'When AI finishes a task it pushes it here over MCP, so nothing slips by.',
+
+  // ---------------- Task card ----------------
+  'task.addTitle': 'Add a task manually',
+  'task.remindAt': 'Remind {time}',
+  'task.deleteTitle': 'Archive (recoverable from the “All” tab)',
+  'task.hardDeleteTitle': 'Delete permanently (cannot be undone)',
+  'task.deleteLabel': 'Archive task',
+  'task.hardDeleteLabel': 'Delete task permanently',
+  'task.deletedToast': 'Archived — find it again under the “All” tab',
+
+  // ---------------- Actions ----------------
+  'action.ack': 'Take',
+  'action.done': 'Done',
+  'action.snooze': 'Snooze',
+  'action.snooze1h': 'In 1 hour',
+  'action.snoozeTonight': 'Tonight 20:00',
+  'action.snoozeMorning': 'Tomorrow 09:00',
+  'action.snoozedToast': 'Snoozed until {time}',
+
+  // ---------------- Confirm dialog ----------------
+  'confirm.title': 'Confirm',
+  'confirm.ok': 'Confirm',
+  'confirm.cancel': 'Cancel',
+  'confirm.hardDeleteTitle': 'Delete this task permanently?',
+  'confirm.hardDeleteText': 'This cannot be undone. The task and its notification records are removed for good.',
+  'confirm.hardDeleteOk': 'Delete permanently',
+  'confirm.hardDeletedToast': 'Deleted permanently',
+  'confirm.purgeTitle': 'Clear {count} archived tasks?',
+  'confirm.purgeText': 'These tasks will be deleted for good and cannot be recovered. Pending, in-progress and done tasks are not affected.',
+  'confirm.purgeOk': 'Delete all',
+  'confirm.purgedToast': 'Cleared {count} archived tasks',
+
+  // ---------------- Manual add ----------------
+  'taskDialog.title': 'Add a task manually',
+  'taskDialog.fieldTitle': 'Title',
+  'taskDialog.titlePlaceholder': 'What needs doing?',
+  'taskDialog.fieldDetail': 'Details (optional)',
+  'taskDialog.detailPlaceholder': 'Add any context',
+  'taskDialog.fieldSeverity': 'Level',
+  'taskDialog.fieldProject': 'Project',
+  'taskDialog.projectPlaceholder': 'Optional',
+  'taskDialog.notify': 'Notify me right away',
+  'taskDialog.cancel': 'Cancel',
+  'taskDialog.submit': 'Add',
+  'taskDialog.addedToast': 'Added',
+
+  // ---------------- Drawer: settings ----------------
+  'drawer.rules': 'Notification rules',
+  'drawer.settings': 'Settings',
+  'drawer.close': 'Close',
+  'section.status': 'Status',
+  'section.account': 'Account',
+  'section.tokens': 'Access tokens',
+  'section.mcp': 'MCP setup',
+  'section.users': 'User management',
+  'section.shortcuts': 'Keyboard shortcuts',
+  'section.language': 'Language',
+  'section.appearance': 'General',
+
+  'status.notifyPermission': 'Desktop notifications',
+  'status.liveConnection': 'Live connection',
+  'status.pendingTasks': 'Pending tasks',
+  'status.username': 'Username',
+  'status.role': 'Role',
+  'status.roleAdmin': 'Administrator',
+  'status.roleUser': 'Standard user',
+
+  'perm.granted': 'Allowed',
+  'perm.denied': 'Denied',
+  'perm.default': 'Not set',
+  'perm.unsupported': 'Unsupported',
+
+  // ---------------- Access tokens ----------------
+  'token.hint': 'To push tasks over MCP, your AI client needs an access token of your own. The credential must live in the client’s AI_TODO_TOKEN environment variable — the plain token is shown only once, at issue time.',
+  'token.loadFailed': 'Could not load tokens: {message}',
+  'token.empty': 'No tokens issued yet.',
+  'token.lastUsed': 'Last used {time}',
+  'token.neverUsed': 'Never used',
+  'token.revoked': 'Revoked',
+  'token.valid': 'Valid',
+  'token.revoke': 'Revoke',
+  'token.revokedToast': 'Token revoked',
+  'token.namePlaceholder': 'Token name, e.g. claude-code',
+  'token.issue': 'Issue new token',
+  'token.issuedToast': 'Token issued — copy it now',
+  'token.freshLabel': 'Freshly issued token (shown only once)',
+  'token.copy': 'Copy',
+  'token.copiedToast': 'Copied',
+  'token.copyFailedToast': 'Copy failed — select it and copy manually',
+
+  // ---------------- MCP ----------------
+  'mcp.hint': 'Paste this into your AI client’s MCP configuration (MCode / Claude Code / Cursor) and the AI can push finished tasks to you.',
+  'mcp.args': '<your project path>/dist/src/cli.js',
+  'mcp.tokenPlaceholder': '<paste a token issued above>',
+  'mcp.isolation': 'Each user only sees their own tasks — the token decides who a task lands for.',
+
+  // ---------------- User management ----------------
+  'user.hint': 'Administrators can create and disable accounts. Initial passwords and access tokens are shown only once.',
+  'user.loadFailed': 'Could not load users: {message}',
+  'user.noUsername': '(no username)',
+  'user.flagAdmin': 'Administrator',
+  'user.flagDisabled': 'Disabled',
+  'user.flagNormal': 'Active',
+  'user.disable': 'Disable',
+  'user.enable': 'Enable',
+  'user.disabledToast': 'Account disabled',
+  'user.enabledToast': 'Account enabled',
+  'user.newUsernamePlaceholder': 'New username (3–32 chars: lowercase letters, digits, . _ -)',
+  'user.create': 'Create account',
+  'user.needUsername': 'Please enter a username',
+  'user.createdToast': 'Account created: {username} — the initial password is shown only once',
+
+  // ---------------- Notification rules ----------------
+  'rules.loading': 'Loading rules…',
+  'rules.minSeverity': 'Minimum alert level',
+  'rules.minSeverityHint': 'Tasks below this level are stored but never interrupt you.',
+  'rules.minSeverityInfo': 'All notes',
+  'rules.minSeverityNeedHuman': 'Needs-you and up',
+  'rules.minSeverityBlocker': 'Blocking only',
+  'rules.cooldown': 'Cooldown (seconds)',
+  'rules.cooldownHint': 'Several tasks from the same source within this window are merged into one notification. 0 disables merging.',
+  'rules.groupBy': 'Merge by',
+  'rules.groupByHint': 'Decides which tasks get merged together.',
+  'rules.groupBySession': 'AI session',
+  'rules.groupByProject': 'Project',
+  'rules.groupByNone': 'Never merge',
+  'rules.quietHours': 'Quiet hours',
+  'rules.quietHoursHint': 'Leave empty to disable. Crosses midnight like 23:00 → 08:00.',
+  'rules.digestHour': 'Daily digest at',
+  'rules.digestHourHint': 'Leave empty to disable. Acts as a safety net so nothing important slips by.',
+  'rules.save': 'Save rules',
+  'rules.quietHoursFormat': 'Quiet hours must look like HH:MM - HH:MM',
+  'rules.savedToast': 'Rules saved',
+
+  // ---------------- Shortcuts ----------------
+  'shortcut.move': 'Move up / down',
+  'shortcut.ack': 'Take over',
+  'shortcut.done': 'Mark done',
+  'shortcut.search': 'Focus search',
+
+  // ---------------- Notification permission ----------------
+  'notify.enabledToast': 'Desktop notifications are on',
+  'notify.testTitle': 'AI Todo notifications are on',
+  'notify.testBody': 'This is how AI will ping you when it finishes something.',
+
+  // ---------------- Server errors (translated by code) ----------------
+  'error.unauthorized': 'Your session expired — please sign in again',
+  'error.invalid_credentials': 'Incorrect username or password',
+  'error.invalid_argument': 'Invalid argument',
+  'error.invalid_argument.enum': 'Invalid value for {param}: {value}. Allowed: {allowed}',
+  'error.invalid_argument.uuid': 'Path parameter {param} is not a valid UUID: {value}',
+  'error.forbidden': 'Not allowed',
+  'error.not_found': 'Not found',
+  'error.task_not_found': 'Task not found',
+  'error.task_not_archived': 'Archive the task first — only archived tasks can be deleted permanently',
+  'error.token_not_found': 'Token not found',
+  'error.user_not_found': 'User not found',
+};
