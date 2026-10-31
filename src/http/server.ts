@@ -13,7 +13,16 @@ import { UserService, isValidUsername } from '../domain/users.js';
 import { generatePassword } from '../domain/passwords.js';
 import { NotificationBus } from '../notify/bus.js';
 import type { NotificationOrchestrator } from '../notify/orchestrator.js';
-import { createAuthenticator, createSession, currentAuth, generateToken, hashToken } from './auth.js';
+import {
+  createAuthenticator,
+  createSession,
+  currentAuth,
+  generateToken,
+  hashToken,
+  resolvePatToken,
+  type AuthContext,
+} from './auth.js';
+import { createMcpHttpHandler } from '../mcp/http.js';
 
 const linkSchema = z.object({
   label: z.string().max(120).optional(),
@@ -263,6 +272,60 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     reply.clearCookie(config.cookieName, { path: '/' });
     return { ok: true };
   });
+
+  // ---------------------------------------------------------------- MCP over HTTP
+
+  /**
+   * 远程 MCP 端点（Streamable HTTP）。
+   *
+   * 为什么要有它：stdio 形态要求「AI 客户端和 MCP Server 在同一台机器上」，
+   * 于是客户端机器必须装 Node、装依赖、还得有一份编译产物。
+   * 有了这个端点，客户端只要填一个 URL 和一枚 Bearer 令牌，本机什么都不用装——
+   * Trae / Cursor / Claude Code 都原生支持远程 HTTP MCP。
+   *
+   * 鉴权只认 Bearer PAT，不认会话 Cookie：
+   * 会话 Cookie 是浏览器凭据，让它能调 MCP 等于把「网页里的脚本」
+   * 也变成能推任务的通道；PAT 是机器凭据，只能由客户端显式配置，
+   * 与 stdio 形态的语义完全一致。
+   */
+  const authenticatePat = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const header = req.headers.authorization;
+    if (!header?.startsWith('Bearer ')) {
+      reply
+        .code(401)
+        .header('www-authenticate', 'Bearer')
+        .send({ error: { code: 'unauthorized', message: '需要 Bearer 访问令牌' } });
+      return;
+    }
+    const token = header.slice(7).trim();
+    const ctx = await resolvePatToken(db, token);
+    if (!ctx) {
+      reply
+        .code(401)
+        .header('www-authenticate', 'Bearer')
+        .send({ error: { code: 'unauthorized', message: '访问令牌无效或已吊销' } });
+      return;
+    }
+    (req as FastifyRequest & { auth?: AuthContext }).auth = ctx;
+    (req as FastifyRequest & { mcpToken?: string }).mcpToken = token;
+  };
+
+  if (config.mcpHttpEnabled) {
+    const handleMcp = createMcpHttpHandler({
+      // 工具回调 REST API 时走回环地址：不经过端口映射，容器内外都成立
+      internalBaseUrl: `http://127.0.0.1:${config.port}`,
+      defaultAgent: process.env.AI_TODO_AGENT?.trim() || 'mcp-http',
+      sourceLabel: process.env.AI_TODO_SOURCE_LABEL?.trim() || undefined,
+    });
+    // GET / DELETE 在无状态模式下由传输层自己回 405 并说明原因，
+    // 不在这里另写一套，免得两处说法不一致。
+    app.route({
+      method: ['GET', 'POST', 'DELETE'],
+      url: '/mcp',
+      preHandler: authenticatePat,
+      handler: handleMcp,
+    });
+  }
 
   // ---------------------------------------------------------------- 访问令牌
 

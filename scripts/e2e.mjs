@@ -1010,6 +1010,128 @@ async function main() {
     purgeUser,
   );
 
+  /* 17. 远程 MCP（Streamable HTTP） */
+  console.log('\n[17] 远程 MCP over HTTP');
+
+  // 没有令牌 / 令牌无效都必须 401。
+  // 端点只认 Bearer PAT，不认会话 Cookie——Cookie 是浏览器凭据，
+  // 让它能调 MCP 等于把网页脚本也变成推任务的通道。
+  const mcpNoAuth = await fetch(`${BASE}/mcp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+  });
+  check('远程 MCP 无令牌返回 401', mcpNoAuth.status === 401, `HTTP ${mcpNoAuth.status}`);
+
+  const mcpBadAuth = await fetch(`${BASE}/mcp`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      authorization: 'Bearer ait_definitely_not_a_real_token',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+  });
+  check('远程 MCP 无效令牌返回 401', mcpBadAuth.status === 401, `HTTP ${mcpBadAuth.status}`);
+
+  const mcpCookieOnly = await fetch(`${BASE}/mcp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+  });
+  check(
+    '远程 MCP 不接受会话 Cookie（只认 Bearer PAT）',
+    mcpCookieOnly.status === 401,
+    `HTTP ${mcpCookieOnly.status}`,
+  );
+
+  const { StreamableHTTPClientTransport } = await import(
+    '@modelcontextprotocol/sdk/client/streamableHttp.js'
+  );
+  const httpTransport = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), {
+    requestInit: {
+      headers: {
+        authorization: `Bearer ${createdUser.body.token}`,
+        'x-ai-todo-agent': 'e2e-http',
+      },
+    },
+  });
+  const httpClient = new Client({ name: 'ai-todo-e2e-http', version: '1.0.0' });
+  await httpClient.connect(httpTransport);
+  check('远程 MCP 客户端可以连上', httpClient.getServerVersion()?.name === 'ai-todo');
+
+  const httpTools = await httpClient.listTools();
+  const httpToolNames = httpTools.tools.map((t) => t.name).sort();
+  check(
+    '远程 MCP 暴露 7 个工具',
+    httpToolNames.join(',') ===
+      'todo_ack,todo_archive,todo_create,todo_done,todo_list,todo_snooze,todo_update',
+    httpToolNames.join(','),
+  );
+  check(
+    '远程 MCP 与 stdio 形态的工具完全一致',
+    httpToolNames.join(',') === toolNames.join(','),
+    `http=${httpToolNames.join(',')} | stdio=${toolNames.join(',')}`,
+  );
+
+  const httpResources = await httpClient.listResources();
+  check(
+    '远程 MCP 暴露 todo://tasks 资源',
+    httpResources.resources.some((r) => r.uri === 'todo://tasks'),
+  );
+
+  const httpStamp = Date.now();
+  const httpCall = await httpClient.callTool({
+    name: 'todo_create',
+    arguments: {
+      title: `HTTP MCP 创建的任务 ${httpStamp}`,
+      detail: '由远程 MCP 客户端创建',
+      severity: 'need_human',
+      project: 'e2e-mcp-http',
+    },
+  });
+  const httpText = httpCall.content?.[0]?.text ?? '';
+  check('远程 MCP todo_create 调用成功', !httpCall.isError && httpText.includes('已记录'), httpText);
+
+  // 默认幂等键是 agent:session:标题哈希。HTTP 形态的 session key 由令牌派生，
+  // 必须稳定——否则同一个客户端连推两次会被当成两条不同任务，幂等形同虚设。
+  const httpCall2 = await httpClient.callTool({
+    name: 'todo_create',
+    arguments: { title: `HTTP MCP 创建的任务 ${httpStamp}`, project: 'e2e-mcp-http' },
+  });
+  const httpText2 = httpCall2.content?.[0]?.text ?? '';
+  check('远程 MCP 默认幂等键命中重复创建', httpText2.includes('幂等命中'), httpText2);
+
+  const httpTaskId = httpCall.structuredContent?.task_id;
+  const httpListed = await httpClient.callTool({ name: 'todo_list', arguments: { q: 'HTTP MCP 创建的任务' } });
+  check('远程 MCP todo_list 可用', !httpListed.isError, httpListed.content?.[0]?.text?.slice(0, 60));
+
+  const httpRead = await httpClient.readResource({ uri: 'todo://tasks' });
+  const httpReadText = httpRead.contents?.[0]?.text ?? '';
+  check(
+    '远程 MCP 资源可读',
+    typeof httpReadText === 'string' && httpReadText.includes('待我关注'),
+    httpReadText.slice(0, 40),
+  );
+
+  // 无状态模式下不支持 SSE 订阅流，GET 应该被明确拒绝而不是挂住。
+  const mcpGet = await fetch(`${BASE}/mcp`, {
+    headers: { authorization: `Bearer ${createdUser.body.token}` },
+  });
+  check('远程 MCP 的 GET 被拒（无状态模式不支持订阅流）', mcpGet.status === 405, `HTTP ${mcpGet.status}`);
+
+  // 跨用户隔离：管理员看不到隔离账号通过远程 MCP 建的任务
+  const adminSeesHttpTask = await api(`/api/v1/tasks/${httpTaskId}`);
+  check(
+    '远程 MCP 建的任务对别的账号不可见（404）',
+    adminSeesHttpTask.res.status === 404,
+    `HTTP ${adminSeesHttpTask.res.status}`,
+  );
+
+  await httpClient.callTool({ name: 'todo_archive', arguments: { id: httpTaskId } });
+  await httpClient.close();
+  await httpTransport.close?.();
+
   /* 清理 */
   console.log('\n[清理] 归档测试任务并删除测试账号');
 

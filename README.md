@@ -197,6 +197,31 @@ MCP Server 被 AI 客户端拉起时，**只认环境变量里的 `AI_TODO_TOKEN
 
 ### 客户端配置
 
+**方式一：远程 HTTP（客户端机器什么都不用装）**
+
+服务端自带 `POST /mcp`（Streamable HTTP）。客户端只要一个 URL 和一枚令牌：
+
+```json
+{
+  "mcpServers": {
+    "ai-todo": {
+      "url": "http://192.168.1.20:8787/mcp",
+      "headers": {
+        "Authorization": "Bearer ait_xxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+Trae / Cursor / Claude Code 都原生支持远程 HTTP MCP。
+Trae 里选「设置 → MCP → 添加 → 手动添加」，传输类型选 **HTTP**，填 URL 与请求头。
+
+> 这个端点只认 `Authorization: Bearer <令牌>`，**不接受浏览器会话 Cookie**。
+> 它等同于一个「拿着令牌就能往你列表里写东西」的接口——暴露到公网前请务必套 HTTPS。
+
+**方式二：stdio（客户端与服务端同一台机器）**
+
 ```json
 {
   "mcpServers": {
@@ -211,6 +236,12 @@ MCP Server 被 AI 客户端拉起时，**只认环境变量里的 `AI_TODO_TOKEN
   }
 }
 ```
+
+> ⚠️ **stdio 最容易踩的坑**：`args` 里的路径必须是**拉起 MCP 的那台机器**上的路径。
+> Docker 镜像里的 `/app/dist/src/cli.js` 是**容器内**路径，写进客户端配置会直接报
+> `Cannot find module '/app/dist/src/cli.js'`。容器里跑的只是**服务端**；
+> MCP Server 是个很薄的 HTTP 客户端，在哪儿跑都行——只要它能通过
+> `AI_TODO_BASE_URL` 找到服务端。
 
 > Windows 上如果 `node` 不在 PATH，把 `command` 换成完整路径 `"C:\\Program Files\\nodejs\\node.exe"`。
 
@@ -227,6 +258,12 @@ MCP Server 被 AI 客户端拉起时，**只认环境变量里的 `AI_TODO_TOKEN
 | `AI_TODO_SESSION_KEY` | 会话标识（决定聚合分组） | 每次启动随机 UUID |
 | `AI_TODO_AGENT` | 来源标识 | `mcp-client` |
 | `AI_TODO_SOURCE_LABEL` | 来源显示名 | 无 |
+
+配好之后拿脚本自检一遍（会真的建一条任务再归档掉）：
+
+```powershell
+node scripts/mcp-http-check.mjs --url http://192.168.1.20:8787/mcp --token ait_xxxxxxxx
+```
 
 ---
 
@@ -333,7 +370,8 @@ src/
     server.ts        Fastify 路由、SSE 端点、账号与令牌管理、静态文件
   mcp/
     client.ts        REST 客户端
-    server.ts        stdio MCP Server（7 个工具 + 1 个资源）
+    server.ts        MCP Server 实现（7 个工具 + 1 个资源，stdio / HTTP 共用）
+    http.ts          远程 MCP 端点（Streamable HTTP，无状态 + Bearer PAT）
 web/
   index.html         应用壳
   styles.css         亮/暗双主题
@@ -346,7 +384,8 @@ web/
   manifest.webmanifest
   icon.svg
 scripts/
-  e2e.mjs            端到端验证脚本（124 项检查）
+  e2e.mjs            端到端验证脚本（137 项检查）
+  mcp-http-check.mjs 远程 MCP 连通性自检（会真的建一条任务再归档掉）
   start.cmd          Windows 一键启动（自动定位 Node、必要时先编译）
 Dockerfile           多阶段构建：编译 → 只留运行时依赖与产物，非 root 运行
 docker-compose.yml   生产部署：app + PostgreSQL 16
@@ -354,7 +393,7 @@ docker-compose.pglite.yml  轻量部署：单容器，内置 PGlite
 .dockerignore        挡住 data/、.env、node_modules 等，不让本地凭据进镜像
 .env.example         容器部署可用环境变量清单
 docs/
-  technical-design.md       技术方案 v0.12
+  technical-design.md       技术方案 v0.14
   deployment.md              Docker 部署指南（部署 / 备份 / MCP 接入 / 排错）
   form-factor-research.html 形态选型调研报告
 ```
@@ -374,6 +413,7 @@ docs/
 | `AI_TODO_WEB_DIR` | `web` | 前端静态目录 |
 | `AI_TODO_SESSION_TTL_DAYS` | `30` | 会话 Cookie 有效期 |
 | `AI_TODO_LOG_LEVEL` | `info` | 日志级别 |
+| `AI_TODO_MCP_HTTP` | `on` | 远程 MCP 端点（`POST /mcp`）；设为 `off` 关闭 |
 | `DATABASE_URL` | 空 | 设置后改用标准 PostgreSQL 驱动；不设置则用 PGlite（零安装） |
 
 数据库保持真实 PostgreSQL 语法（jsonb、部分索引、枚举、`ON CONFLICT` 推断），设了 `DATABASE_URL` 即可平移到 Postgres，不返工。
@@ -429,7 +469,7 @@ npm start            # 另开一个终端保持运行
 node scripts/e2e.mjs # 另一个终端跑验证
 ```
 
-覆盖 124 项检查：健康检查、静态资源、**前端静态检查（5 项）**、**i18n 静态检查（6 项）**、用户名密码登录、错误密码被拒、**退出登录后旧会话立即 401**、SSE 推送、任务创建、幂等命中、不打扰场景、冷却窗口聚合、blocker 绕过、状态流转、归档、规则读写、通知记录、**多用户隔离**、令牌自助签发与吊销、禁用账号后令牌立即失效、**非法枚举查询参数返回 400**、**无 body 的 JSON 头 POST 可用**、**非法 JSON body 返回 400**、**`__proto__` 污染被拦截**、**非法 UUID 路径参数返回 400**、**未鉴权请求先回 401**、MCP stdio 全流程、**MCP 缺少环境变量凭证时拒绝启动**、**通知聚合不跨账号串台**、**账号在聚合窗口期内被删除后服务仍然存活**、**未归档的任务不能彻底删除**、**已归档的任务可以彻底删除**、**别的账号删不掉我的任务**、**批量清空只清自己的已归档任务**。
+覆盖 137 项检查：健康检查、静态资源、**前端静态检查（5 项）**、**i18n 静态检查（6 项）**、用户名密码登录、错误密码被拒、**退出登录后旧会话立即 401**、SSE 推送、任务创建、幂等命中、不打扰场景、冷却窗口聚合、blocker 绕过、状态流转、归档、规则读写、通知记录、**多用户隔离**、令牌自助签发与吊销、禁用账号后令牌立即失效、**非法枚举查询参数返回 400**、**无 body 的 JSON 头 POST 可用**、**非法 JSON body 返回 400**、**`__proto__` 污染被拦截**、**非法 UUID 路径参数返回 400**、**未鉴权请求先回 401**、MCP stdio 全流程、**MCP 缺少环境变量凭证时拒绝启动**、**远程 MCP（HTTP）鉴权与工具一致性**、**通知聚合不跨账号串台**、**账号在聚合窗口期内被删除后服务仍然存活**、**未归档的任务不能彻底删除**、**已归档的任务可以彻底删除**、**别的账号删不掉我的任务**、**批量清空只清自己的已归档任务**。
 
 脚本默认连 `http://127.0.0.1:8787` 并读 `data/admin-credentials.txt`；指向别的实例时用环境变量覆盖：
 
@@ -447,8 +487,8 @@ node scripts/e2e.mjs
 
 ## 已实现 / 未实现
 
-**已实现**：账号体系（用户名 + 密码登录、scrypt 哈希、启用/禁用、角色）、用户级数据隔离、访问令牌自助签发与吊销、管理员用户管理、任务模型与状态机、幂等写入、MCP 7 工具 + 1 资源、REST API、SSE 实时推送、首条即时 + 尾部合并的节流、静默时段、每日摘要、到点提醒（`due_at`）、PWA + 系统级通知、通知规则配置面板、快捷键（`j`/`k`/`a`/`d`/`/`）、PGlite 零安装运行、**多语言（简体中文 / English）**。
+**已实现**：账号体系（用户名 + 密码登录、scrypt 哈希、启用/禁用、角色）、用户级数据隔离、访问令牌自助签发与吊销、管理员用户管理、任务模型与状态机、幂等写入、MCP 7 工具 + 1 资源、REST API、SSE 实时推送、首条即时 + 尾部合并的节流、静默时段、每日摘要、到点提醒（`due_at`）、PWA + 系统级通知、通知规则配置面板、**远程 MCP（Streamable HTTP，客户端零安装）**、快捷键（`j`/`k`/`a`/`d`/`/`）、PGlite 零安装运行、**多语言（简体中文 / English）**。
 
-**未实现（v2+）**：自助注册、密码找回、看板/甘特图视图、离线编辑冲突合并、外部推送通道（微信/邮件/Server酱）、桌面原生壳、远程 Streamable HTTP MCP、移动端。
+**未实现（v2+）**：自助注册、密码找回、看板/甘特图视图、离线编辑冲突合并、外部推送通道（微信/邮件/Server酱）、桌面原生壳、OAuth 2.1 授权（远程 MCP 当前用 Bearer PAT 直连）、移动端。
 
 > 外部通道的接入位已经预留：配置 A 与配置 B 的任务模型、MCP 工具、REST API、聚合规则完全一致，切换不返工。

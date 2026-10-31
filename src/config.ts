@@ -49,6 +49,8 @@ export interface Config {
   cookieName: string;
   sessionTtlDays: number;
   logLevel: string;
+  /** 远程 MCP 端点（/mcp）是否开启 */
+  mcpHttpEnabled: boolean;
   /** 保留给未来的外部通道（配置 B）；配置 A 下始终为空 */
   externalChannels: string[];
 }
@@ -72,6 +74,7 @@ export function loadConfig(): Config {
     cookieName: 'ai_todo_session',
     sessionTtlDays: Number(process.env.AI_TODO_SESSION_TTL_DAYS ?? 30),
     logLevel: process.env.AI_TODO_LOG_LEVEL ?? 'info',
+    mcpHttpEnabled: (process.env.AI_TODO_MCP_HTTP ?? 'on').trim().toLowerCase() !== 'off',
     externalChannels: [],
   };
 }

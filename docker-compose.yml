@@ -37,6 +37,8 @@ services:
       AI_TODO_BASE_URL: "${AI_TODO_PUBLIC_URL:-http://localhost:8787}"
       AI_TODO_LOG_LEVEL: "${AI_TODO_LOG_LEVEL:-info}"
       AI_TODO_SESSION_TTL_DAYS: "${AI_TODO_SESSION_TTL_DAYS:-30}"
+      # 远程 MCP 端点（POST /mcp）：客户端填 URL + Bearer 令牌即可远程接入
+      AI_TODO_MCP_HTTP: "${AI_TODO_MCP_HTTP:-on}"
       # 走真正的 PostgreSQL。密码只用字母数字与下划线——
       # 这个值要拼进连接 URL，含 @ : / # 会破坏 URL 解析。
       DATABASE_URL: "postgres://${POSTGRES_USER:-ai_todo}:${POSTGRES_PASSWORD:-ai_todo}@postgres:5432/${POSTGRES_DB:-ai_todo}"

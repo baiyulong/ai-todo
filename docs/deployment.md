@@ -195,9 +195,56 @@ docker compose run --rm mcp
 
 > 方案 B 只在「AI 客户端本身就支持用 docker 命令当 MCP Server」时才好用。多数桌面客户端不支持，所以默认推荐方案 A。
 
-### 为什么不提供远程 HTTP MCP？
+### 方案 C（最省事）：客户端连远程 HTTP 端点
 
-远程 MCP 需要在服务端常驻一个 HTTP 端点并处理会话、鉴权、CSRF——这套东西的复杂度远高于它带来的收益，而 stdio + 环境变量凭据已经能覆盖绝大多数场景。当前形态是刻意收敛的。
+服务端自带 `POST /mcp`（Streamable HTTP）。**客户端机器上什么都不用装**——
+不用 Node、不用依赖、不用 clone 项目，只要一个 URL 和一枚令牌：
+
+```json
+{
+  "mcpServers": {
+    "ai-todo": {
+      "url": "http://192.168.1.20:8787/mcp",
+      "headers": {
+        "Authorization": "Bearer ait_xxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+Trae / Cursor / Claude Code 都原生支持远程 HTTP MCP（Trae 在「设置 → MCP → 添加 → 手动添加」里选 **HTTP** 类型，填 URL 和请求头）。
+
+| 特性 | 说明 |
+|---|---|
+| 端点 | `POST /mcp`（`GET` / `DELETE` 在无状态模式下返回 405） |
+| 鉴权 | 只认 `Authorization: Bearer <访问令牌>`，**不接受会话 Cookie** |
+| 会话 | 无状态——服务端不存任何会话状态，多实例、重启都不影响 |
+| 来源标识 | 客户端可带 `X-Ai-Todo-Agent` 头标记自己（如 `trae`、`cursor`），任务卡片上会显示 |
+| 开关 | `AI_TODO_MCP_HTTP=off` 可关闭该端点 |
+
+配置完拿脚本自检一遍（会真的建一条任务再归档掉）：
+
+```powershell
+$env:AI_TODO_TOKEN = "ait_xxxxxxxx"
+node scripts/mcp-http-check.mjs --url http://192.168.1.20:8787/mcp
+```
+
+> **暴露到公网前请三思**：这个端点等同于一个「用令牌就能往你列表里写东西」的接口。
+> 令牌泄露 = 任何人都能给你塞任务。放到公网至少套一层 HTTPS 反代，
+> 并且只发一枚专用令牌、给它单独的账号。
+
+### 为什么不提供带会话的远程 HTTP MCP？
+
+「远程 MCP 要处理会话、鉴权、CSRF，复杂度远高于收益」——这个判断在**有状态**实现下成立。
+本项目选了一条捷径把它绕开：
+
+- **无状态**：不生成 `Mcp-Session-Id`，每个 HTTP 请求独立处理。没有会话表、没有会话清理、没有粘性会话要求。
+- **只认 Bearer PAT**：没有 Cookie 参与，就不存在「浏览器自动带上凭据」这回事，CSRF 直接不成立。
+- **单次 JSON 响应**：不挂 SSE 长连接，请求结束连接就结束。
+
+代价是放弃服务端主动推送（`notifications/tools/list_changed` 等）。本项目用不上——
+工具清单是静态的，任务变更走 Web 端的 SSE 通道，不走 MCP 通道。
 
 ---
 
