@@ -23,6 +23,8 @@ import {
   type AuthContext,
 } from './auth.js';
 import { createMcpHttpHandler } from '../mcp/http.js';
+import { createWechatClient } from '../domain/wechat.js';
+import { registerWechatRoutes } from './wechat.js';
 
 const linkSchema = z.object({
   label: z.string().max(120).optional(),
@@ -272,6 +274,50 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     reply.clearCookie(config.cookieName, { path: '/' });
     return { ok: true };
   });
+
+  // ---------------------------------------------------------------- 微信登录
+
+  /**
+   * 微信扫码登录。没配 AppID/Secret 时整体关闭——登录页不显示微信入口，
+   * 密码登录照常工作。配了之后，桌面端扫码、手机端授权、桌面端取回会话。
+   */
+  const wechatClient = createWechatClient({
+    enabled: config.wechat.enabled,
+    mock: config.wechat.mock,
+    appId: config.wechat.appId,
+    appSecret: config.wechat.appSecret,
+    mode: config.wechat.mode,
+    baseUrl: config.baseUrl,
+  });
+
+  if (wechatClient) {
+    registerWechatRoutes({
+      app,
+      db,
+      config,
+      users,
+      client: wechatClient,
+      authenticate,
+    });
+    if (wechatClient.mock) {
+      const phoneReachable = !/^(https?:\/\/)(127\.0\.0\.1|localhost|\[::1\])/.test(config.baseUrl);
+      app.log.warn(
+        '微信登录处于模拟模式（AI_TODO_WECHAT_MOCK=on）：任何人都能用假 openid 登录本服务。生产环境请关掉。',
+      );
+      if (!phoneReachable) {
+        // 二维码里编码的是 baseUrl：手机扫到的是「手机自己的」127.0.0.1，打不开
+        app.log.warn(
+          `模拟二维码当前指向 ${config.baseUrl}，手机扫码打不开。` +
+            '请把 AI_TODO_BASE_URL 设成手机能访问的地址（例如 http://192.168.1.20:8787）后重启。',
+        );
+      }
+    }
+  } else {
+    // 关闭时也要给前端一个明确答复，省得它猜「是没配还是接口坏了」
+    app.get('/api/v1/auth/providers', async () => ({
+      wechat: { enabled: false, mode: config.wechat.mode, mock: false },
+    }));
+  }
 
   // ---------------------------------------------------------------- MCP over HTTP
 
@@ -787,6 +833,9 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       username: user?.username ?? null,
       display_name: user?.display_name ?? null,
       is_admin: ctx.scopes.includes('admin'),
+      // 是否已绑定微信：界面据此显示「绑定 / 重新绑定」
+      wechat_bound: !!user?.wechat_openid,
+      wechat_nickname: user?.wechat_nickname ?? null,
       pending,
       archived,
       rules,

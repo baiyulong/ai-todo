@@ -179,6 +179,51 @@ npm run user -- token alice --name=claude  # 为 alice 签发一枚 MCP 用的�
 
 ---
 
+## 微信登录
+
+不想记用户名密码时，可以改成**扫码登录**：桌面端点「微信登录」→ 手机微信扫码授权 → 自动进系统。
+
+### 两条路线，先看你手里有什么
+
+| | 开放平台「网站应用」扫码 | 公众号网页授权 |
+|---|---|---|
+| 模式值 | `AI_TODO_WECHAT_MODE=qrconnect`（默认） | `AI_TODO_WECHAT_MODE=official` |
+| 桌面体验 | 最好，扫码即登录 | 授权页必须在微信里打开，桌面要靠二维码把人导到手机 |
+| 需要什么 | **企业 / 个体工商户主体** + **已 ICP 备案的域名** + 备案主体与开放平台主体一致 + 300 元认证与审核 | **已认证公众号** + 已备案域名 |
+| 个人主体 | 基本走不通 | 走不通 |
+
+**两条路线都要求回调地址是一个已备案的真实域名**——`localhost`、`127.0.0.1`、局域网 IP 都不行（这是微信平台的规定，不是本项目的限制）。真实扫码时二维码里指向的是 `open.weixin.qq.com`，手机当然能打开；受限制的只是「授权成功后微信回到你的服务器」那一步。
+
+### 配置步骤
+
+```bash
+# .env
+AI_TODO_WECHAT_APPID=wx1234567890abcdef
+AI_TODO_WECHAT_SECRET=xxxxxxxxxxxxxxxx
+AI_TODO_WECHAT_MODE=qrconnect            # qrconnect（网站应用）| official（公众号）
+AI_TODO_WECHAT_REDIRECT_URI=https://todo.example.com/api/v1/auth/wechat/callback
+AI_TODO_WECHAT_ADMIN_OPENIDS=oXXXXXXXXXXXXXXXXXXXX   # 逗号分隔，命中即管理员
+```
+
+1. 在微信开放平台 / 公众号后台把回调地址登记进「授权回调域名」；
+2. 填好上面的环境变量后重启服务；
+3. 登录页出现「微信登录」入口，扫码即可。
+
+`AI_TODO_WECHAT_REDIRECT_URI` 留空时会用 `AI_TODO_BASE_URL` + `/api/v1/auth/wechat/callback`，两者必须和微信后台登记的一致。
+
+### 现在就能用：先把微信绑到已有账号
+
+**不用重建账号**。已登录状态下进「设置 → 绑定微信」，扫码即把这个微信挂到当前账号上——历史任务、令牌、通知规则全都还在。管理员把自己常用的微信绑上之后，日常就用扫码登录。
+
+### 其它
+
+- **密码登录始终保留**：微信侧故障、或管理员账号，仍需要它。
+- **首次微信登录**（此前没有账号）会自动建号，并顺手签发一枚 MCP 访问令牌，弹窗里复制即可，只显示一次。
+- **一个微信身份只能对应一个账号**；已被占用的微信再绑到别的账号会被拒绝。
+- 完整细节（资质清单、常见问题、模拟模式）见 [`docs/deployment.md`](docs/deployment.md)。
+
+---
+
 ## 接入 AI 客户端（MCP）
 
 ### 凭证必须走环境变量
@@ -460,6 +505,13 @@ docs/
 | `AI_TODO_SESSION_TTL_DAYS` | `30` | 会话 Cookie 有效期 |
 | `AI_TODO_LOG_LEVEL` | `info` | 日志级别 |
 | `AI_TODO_MCP_HTTP` | `on` | 远程 MCP 端点（`POST /mcp`）；设为 `off` 关闭 |
+| `AI_TODO_WECHAT_APPID` | 空 | 微信 AppID；留空即关闭微信登录 |
+| `AI_TODO_WECHAT_SECRET` | 空 | 微信 AppSecret（只从环境变量读） |
+| `AI_TODO_WECHAT_MODE` | `qrconnect` | `qrconnect`=开放平台网站应用；`official`=公众号网页授权 |
+| `AI_TODO_WECHAT_REDIRECT_URI` | `AI_TODO_BASE_URL` + 回调路径 | 微信回调地址，必须与微信后台登记的一致 |
+| `AI_TODO_WECHAT_ADMIN_OPENIDS` | 空 | 逗号分隔的 openid 白名单，命中即管理员 |
+| `AI_TODO_WECHAT_AUTO_TOKEN` | `on` | 首次微信登录是否自动签发一枚 MCP 令牌 |
+| `AI_TODO_WECHAT_MOCK` | `off` | 模拟模式；生产环境务必 `off` |
 | `DATABASE_URL` | 空 | 设置后改用标准 PostgreSQL 驱动；不设置则用 PGlite（零安装） |
 
 数据库保持真实 PostgreSQL 语法（jsonb、部分索引、枚举、`ON CONFLICT` 推断），设了 `DATABASE_URL` 即可平移到 Postgres，不返工。
@@ -476,6 +528,11 @@ docs/
 | `POST` | `/api/v1/auth/login` | 用户名 + 密码换会话 Cookie |
 | `POST` | `/api/v1/auth/token` | 访问令牌换会话 Cookie（脚本用） |
 | `POST` | `/api/v1/auth/logout` | 退出 |
+| `GET` | `/api/v1/auth/providers` | 服务端支持哪些登录方式（免鉴权） |
+| `GET` | `/api/v1/auth/wechat/start` | 发起扫码登录，返回 `state` 与授权地址 |
+| `GET` | `/api/v1/auth/wechat/callback` | 微信回调（带 `code` 与 `state`） |
+| `GET` | `/api/v1/auth/wechat/status` | 桌面端轮询扫码结果，确认后签发会话 Cookie |
+| `POST` | `/api/v1/auth/wechat/bind/start` | 发起「绑定微信」（需已登录） |
 | `GET`/`POST` | `/api/v1/tokens` | 列出 / 签发自己的访问令牌 |
 | `DELETE` | `/api/v1/tokens/:id` | 吊销自己的访问令牌 |
 | `GET`/`POST` | `/api/v1/admin/users` | 列出 / 新建账号（需 admin） |
@@ -533,8 +590,8 @@ node scripts/e2e.mjs
 
 ## 已实现 / 未实现
 
-**已实现**：账号体系（用户名 + 密码登录、scrypt 哈希、启用/禁用、角色）、用户级数据隔离、访问令牌自助签发与吊销、管理员用户管理、任务模型与状态机、幂等写入、MCP 7 工具 + 1 资源、REST API、SSE 实时推送、首条即时 + 尾部合并的节流、静默时段、每日摘要、到点提醒（`due_at`）、PWA + 系统级通知、通知规则配置面板、**远程 MCP（Streamable HTTP，客户端零安装）**、快捷键（`j`/`k`/`a`/`d`/`/`）、PGlite 零安装运行、**多语言（简体中文 / English）**。
+**已实现**：账号体系（用户名 + 密码登录、scrypt 哈希、启用/禁用、角色）、用户级数据隔离、访问令牌自助签发与吊销、管理员用户管理、任务模型与状态机、幂等写入、MCP 7 工具 + 1 资源、REST API、SSE 实时推送、首条即时 + 尾部合并的节流、静默时段、每日摘要、到点提醒（`due_at`）、PWA + 系统级通知、通知规则配置面板、**远程 MCP（Streamable HTTP，客户端零安装）**、快捷键（`j`/`k`/`a`/`d`/`/`）、PGlite 零安装运行、**多语言（简体中文 / English）**、**微信扫码登录（扫码授权、自动建号、绑定已有账号、首次登录自动签发 MCP 令牌；二维码本地生成，不依赖外部图片服务）**。
 
-**未实现（v2+）**：自助注册、密码找回、看板/甘特图视图、离线编辑冲突合并、外部推送通道（微信/邮件/Server酱）、桌面原生壳、OAuth 2.1 授权（远程 MCP 当前用 Bearer PAT 直连）、移动端。
+**未实现（v2+）**：自助注册、密码找回、看板/甘特图视图、离线编辑冲突合并、外部推送通道（邮件/Server酱）、桌面原生壳、OAuth 2.1 授权（远程 MCP 当前用 Bearer PAT 直连）、移动端。
 
 > 外部通道的接入位已经预留：配置 A 与配置 B 的任务模型、MCP 工具、REST API、聚合规则完全一致，切换不返工。

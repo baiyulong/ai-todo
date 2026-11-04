@@ -41,6 +41,22 @@ alter table users add column if not exists is_active boolean not null default tr
 create unique index if not exists users_username_uq
   on users (username) where username is not null;
 
+-- ============ 微信登录：账号映射 ============
+-- 一个微信身份（openid）对应一个站内账号。
+-- openid 在同一个开放平台账号下唯一；unionid 在同一开放平台账号下的多个应用之间唯一，
+-- 拿得到 unionid 时用它兜底换绑（用户可能先在公众号上登过，再来网站应用登）。
+alter table users add column if not exists wechat_openid text;
+alter table users add column if not exists wechat_unionid text;
+alter table users add column if not exists wechat_nickname text;
+alter table users add column if not exists avatar_url text;
+-- 账号的登录方式：password | wechat | both
+alter table users add column if not exists auth_provider text not null default 'password';
+
+create unique index if not exists users_wechat_openid_uq
+  on users (wechat_openid) where wechat_openid is not null;
+create index if not exists users_wechat_unionid_idx
+  on users (wechat_unionid) where wechat_unionid is not null;
+
 -- ============ AI 来源：溯源与聚合维度 ============
 create table if not exists ai_sources (
   id          uuid primary key default gen_random_uuid(),
@@ -143,4 +159,25 @@ create table if not exists sessions (
   last_seen_at timestamptz
 );
 create index if not exists sessions_token_idx on sessions (token_hash);
+
+-- ============ 微信扫码登录的中间态 ============
+-- 桌面端发起扫码 → 手机端微信授权 → 微信回调带 code 回来 → 桌面端轮询取回登录结果。
+-- 桌面和手机是两个设备，session cookie 没法跨过去，所以必须有一个服务端中转站：
+--   state     ：随机串，既是防伪 token 也是桌面端轮询的钥匙
+--   purpose   ：login = 用这个微信身份登录；bind = 把这个微信身份绑到当前账号
+--   status    ：pending → confirmed / failed / expired
+--   session_token / issued_token：签发结果。明文只在这张表里短暂停留（默认 5 分钟），
+--   过期即删；会话本身在 sessions 表里仍然只存哈希。
+create table if not exists auth_pending_logins (
+  state         text primary key,
+  purpose       text not null default 'login',
+  status        text not null default 'pending',
+  user_id       uuid references users(id) on delete cascade,
+  error_code    text,
+  session_token text,
+  issued_token  text,
+  created_at    timestamptz not null default now(),
+  expires_at    timestamptz not null
+);
+create index if not exists pending_login_exp_idx on auth_pending_logins (expires_at);
 `;

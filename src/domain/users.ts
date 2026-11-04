@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import type { Db } from '../db/index.js';
 import { generatePassword, hashPassword, verifyPassword } from './passwords.js';
 
@@ -9,6 +10,12 @@ export interface User {
   is_admin: boolean;
   is_active: boolean;
   created_at: string;
+  /** 登录方式：password | wechat | both */
+  auth_provider: string;
+  /** 已绑定的微信 openid（未绑定为 null） */
+  wechat_openid: string | null;
+  wechat_nickname: string | null;
+  avatar_url: string | null;
 }
 
 interface UserRow {
@@ -20,9 +27,15 @@ interface UserRow {
   is_admin: boolean;
   is_active: boolean;
   created_at: string;
+  auth_provider: string;
+  wechat_openid: string | null;
+  wechat_nickname: string | null;
+  avatar_url: string | null;
 }
 
-const USER_COLUMNS = 'id, username, display_name, email, is_admin, is_active, created_at';
+const USER_COLUMNS =
+  'id, username, display_name, email, is_admin, is_active, created_at, ' +
+  'auth_provider, wechat_openid, wechat_nickname, avatar_url';
 
 /** 用户名：小写字母、数字、点、下划线、连字符，3–32 位 */
 const USERNAME_RE = /^[a-z0-9._-]{3,32}$/;
@@ -57,6 +70,137 @@ export class UserService {
       [normalizeUsername(username)],
     );
     return res.rows[0] ?? null;
+  }
+
+  /* --------------------------------------------------- 微信身份映射 */
+
+  /** 按 openid 找账号（微信身份的主键） */
+  async findByWechatOpenid(openid: string): Promise<User | null> {
+    const res = await this.db.query<UserRow>(
+      `select ${USER_COLUMNS} from users where wechat_openid = $1`,
+      [openid],
+    );
+    return res.rows[0] ?? null;
+  }
+
+  /**
+   * 按 unionid 找账号。
+   * 同一开放平台账号下的多个应用（公众号 + 网站应用）共用同一个 unionid，
+   * 用户在两边是同一个人——用它兜底能避免重复建号。
+   */
+  async findByWechatUnionid(unionid: string): Promise<User | null> {
+    const res = await this.db.query<UserRow>(
+      `select ${USER_COLUMNS} from users where wechat_unionid = $1 and wechat_unionid is not null`,
+      [unionid],
+    );
+    return res.rows[0] ?? null;
+  }
+
+  async countAdmins(): Promise<number> {
+    const res = await this.db.query<{ n: number }>(
+      `select count(*)::int as n from users where is_admin`,
+    );
+    return res.rows[0]?.n ?? 0;
+  }
+
+  /**
+   * 微信首次登录时自动建号。
+   *
+   * 用户名取 openid 的哈希前 16 位：唯一、稳定、且不泄露 openid 本身
+   * （openid 是微信侧的用户标识，不该出现在可见的用户名里）。
+   * 显示名用微信昵称，昵称拿不到时用「微信用户」。
+   *
+   * 用户名可能已经被占用了：同一个 openid 换绑到别的微信之后，
+   * 老账号还留着按旧 openid 派生的用户名。新账号这时要另起一个名字，
+   * 否则会撞上 users_username_uq 直接建不出来。
+   */
+  async createWechatUser(input: {
+    openid: string;
+    unionid?: string | null;
+    nickname?: string | null;
+    avatarUrl?: string | null;
+    isAdmin?: boolean;
+  }): Promise<User> {
+    const suffix = createHash('sha256').update(input.openid).digest('hex').slice(0, 16);
+    const base = `wx_${suffix}`;
+    let username = base;
+    for (let i = 0; i < 6; i++) {
+      const taken = await this.findByUsername(username);
+      if (!taken) break;
+      username = `${base.slice(0, 27)}_${randomBytes(2).toString('hex')}`;
+    }
+    const displayName = (input.nickname ?? '').trim() || '微信用户';
+
+    const res = await this.db.query<UserRow>(
+      `insert into users
+         (username, display_name, email, password_hash, is_admin, is_active,
+          wechat_openid, wechat_unionid, wechat_nickname, avatar_url, auth_provider)
+       values ($1,$2,null,null,$3,true,$4,$5,$6,$7,'wechat')
+       returning ${USER_COLUMNS}`,
+      [
+        username,
+        displayName,
+        input.isAdmin ?? false,
+        input.openid,
+        input.unionid ?? null,
+        (input.nickname ?? '').trim() || null,
+        input.avatarUrl ?? null,
+      ],
+    );
+    return res.rows[0];
+  }
+
+  /**
+   * 把微信身份绑到已有账号。
+   * 已经绑到别的账号上时抛错——一个微信身份只能对应一个账号，
+   * 否则会出现「用同一个微信号登进两个账号」的越权口子。
+   */
+  async linkWechat(
+    userId: string,
+    input: {
+      openid: string;
+      unionid?: string | null;
+      nickname?: string | null;
+      avatarUrl?: string | null;
+    },
+  ): Promise<User> {
+    const owner = await this.findByWechatOpenid(input.openid);
+    if (owner && owner.id !== userId) {
+      throw new Error('wechat_already_bound');
+    }
+    // auth_provider 变成 both：绑了微信之后原来的密码依然能登录
+    await this.db.query(
+      `update users
+          set wechat_openid = $2,
+              wechat_unionid = coalesce($3, wechat_unionid),
+              wechat_nickname = coalesce($4, wechat_nickname),
+              avatar_url = coalesce($5, avatar_url),
+              auth_provider = case when password_hash is null then 'wechat' else 'both' end
+        where id = $1`,
+      [
+        userId,
+        input.openid,
+        input.unionid ?? null,
+        (input.nickname ?? '').trim() || null,
+        input.avatarUrl ?? null,
+      ],
+    );
+    const user = await this.findById(userId);
+    return user!;
+  }
+
+  /**
+   * 解绑微信：账号退回纯密码登录。
+   * 注意：本来就没有密码的账号解绑后会登不进来，管理员得先给它设个密码。
+   */
+  async unlinkWechat(userId: string): Promise<void> {
+    await this.db.query(
+      `update users
+          set wechat_openid = null, wechat_unionid = null, wechat_nickname = null,
+              auth_provider = 'password'
+        where id = $1`,
+      [userId],
+    );
   }
 
   async listUsers(): Promise<User[]> {

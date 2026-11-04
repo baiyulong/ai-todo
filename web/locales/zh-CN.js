@@ -17,6 +17,16 @@ export const dict = {
   'login.hidePassword': '隐藏密码',
   'login.invalidCredentials': '用户名或密码不正确',
 
+  // ---------------- 微信扫码登录 ----------------
+  'login.or': '或',
+  'login.wechatLogin': '微信登录',
+  'login.wechatScanTip': '请用微信扫描二维码',
+  'login.wechatCancel': '取消',
+  'login.wechatExpired': '二维码已过期，请重新扫码',
+  'login.wechatFailed': '微信登录失败，请重试',
+  'login.wechatOpenLink': '在浏览器里打开授权页',
+  'login.wechatQrFailed': '二维码画不出来，请点下面的链接打开授权页',
+
   // ---------------- 顶栏 ----------------
   'topbar.liveStatus': '实时连接状态',
   'topbar.connecting': '连接中',
@@ -124,6 +134,7 @@ export const dict = {
   'section.shortcuts': '快捷键',
   'section.language': '语言',
   'section.appearance': '通用',
+  'section.wechat': '微信账号',
 
   'status.notifyPermission': '桌面通知权限',
   'status.liveConnection': '实时连接',
@@ -132,6 +143,23 @@ export const dict = {
   'status.role': '角色',
   'status.roleAdmin': '管理员',
   'status.roleUser': '普通用户',
+  'status.wechatBound': '微信绑定',
+  'status.wechatYes': '已绑定',
+  'status.wechatNo': '未绑定',
+
+  // ---------------- 微信账号绑定 ----------------
+  'wechat.bind': '绑定微信',
+  'wechat.rebind': '重新绑定微信',
+  'wechat.bindTitle': '绑定微信',
+  'wechat.bindHint':
+    '用微信扫描下面的二维码，把这个微信绑定到当前账号。绑定之后就能直接扫码登录，不用再记用户名密码。',
+  'wechat.scanTip': '请用微信扫描二维码',
+  'wechat.bindDone': '微信绑定成功',
+  'wechat.tokenTitle': '这是你的 MCP 访问令牌',
+  'wechat.tokenHint': '只显示这一次，请立刻复制保存。',
+  'wechat.tokenCopy': '复制',
+  'wechat.tokenCopied': '已复制',
+  'wechat.tokenCopyFailed': '复制失败，请手动选中后复制',
 
   'perm.granted': '已允许',
   'perm.denied': '已拒绝',
@@ -177,6 +205,7 @@ export const dict = {
   'user.noUsername': '(无用户名)',
   'user.flagAdmin': '管理员',
   'user.flagDisabled': '已禁用',
+  'user.flagWechat': '微信登录',
   'user.flagNormal': '正常',
   'user.disable': '禁用',
   'user.enable': '启用',
@@ -232,4 +261,14 @@ export const dict = {
   'error.task_not_archived': '这条任务还没归档，不能彻底删除',
   'error.token_not_found': '令牌不存在',
   'error.user_not_found': '用户不存在',
+
+  // ---------------- 微信登录 ----------------
+  'error.wechat_not_configured': '服务端没有配置微信登录',
+  'error.wechat_state_invalid': '这个扫码请求已失效，请重新发起',
+  'error.wechat_state_expired': '二维码已过期，请重新扫码',
+  'error.wechat_code_invalid': '微信授权码无效或已被使用，请重新扫码',
+  'error.wechat_api_error': '调用微信接口失败，请稍后再试',
+  'error.wechat_already_bound': '这个微信已经绑定到别的账号了',
+  'error.wechat_account_disabled': '这个账号已被禁用',
+  'error.wechat_login_failed': '微信登录失败，请重试',
 };

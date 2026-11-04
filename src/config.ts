@@ -38,6 +38,32 @@ export function loadDotEnv(): void {
   }
 }
 
+/**
+ * 微信登录模式：
+ * - qrconnect：微信开放平台「网站应用」扫码登录（桌面体验最好，需企业主体 + ICP 备案）
+ * - official：公众号网页授权（需已认证公众号，授权页必须在微信里打开）
+ *
+ * 两条路线的换 token 接口完全一样（sns/oauth2/access_token），
+ * 差别只在授权地址与 scope，所以服务端只实现一次，模式由配置切换。
+ */
+export type WechatMode = 'qrconnect' | 'official';
+
+export interface WechatConfig {
+  /** 是否启用微信登录（配齐 AppID/Secret，或打开模拟模式） */
+  enabled: boolean;
+  mode: WechatMode;
+  appId: string;
+  appSecret: string;
+  /** 回调地址：必须是微信后台登记过的域名下的地址 */
+  redirectUri: string;
+  /** 管理员 openid 白名单：逗号分隔 */
+  adminOpenids: string[];
+  /** 首次微信登录时自动签发一枚 MCP 访问令牌 */
+  autoIssueToken: boolean;
+  /** 模拟模式：不连微信官方接口，用本地假 code 跑通整条链路 */
+  mock: boolean;
+}
+
 export interface Config {
   port: number;
   host: string;
@@ -53,6 +79,7 @@ export interface Config {
   mcpHttpEnabled: boolean;
   /** 保留给未来的外部通道（配置 B）；配置 A 下始终为空 */
   externalChannels: string[];
+  wechat: WechatConfig;
 }
 
 export function loadConfig(): Config {
@@ -62,11 +89,28 @@ export function loadConfig(): Config {
   const host = process.env.AI_TODO_HOST ?? '127.0.0.1';
   const dataDir = resolve(packageRoot, process.env.AI_TODO_DATA_DIR ?? 'data');
   const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
+  const baseUrl = process.env.AI_TODO_BASE_URL ?? `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`;
+
+  // 微信登录：凭据只从环境变量读，代码里不写死任何 AppID / Secret。
+  const wechatAppId = process.env.AI_TODO_WECHAT_APPID?.trim() || '';
+  const wechatAppSecret = process.env.AI_TODO_WECHAT_SECRET?.trim() || '';
+  const wechatMock =
+    (process.env.AI_TODO_WECHAT_MOCK ?? 'off').trim().toLowerCase() === 'on';
+  const wechatMode: WechatMode =
+    (process.env.AI_TODO_WECHAT_MODE ?? 'qrconnect').trim().toLowerCase() === 'official'
+      ? 'official'
+      : 'qrconnect';
+  const wechatRedirectUri =
+    process.env.AI_TODO_WECHAT_REDIRECT_URI?.trim() || `${baseUrl}/api/v1/auth/wechat/callback`;
+  const wechatAdminOpenids = (process.env.AI_TODO_WECHAT_ADMIN_OPENIDS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   return {
     port,
     host,
-    baseUrl: process.env.AI_TODO_BASE_URL ?? `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`,
+    baseUrl,
     databaseUrl,
     pgliteDir: resolve(dataDir, 'pgdata'),
     dataDir,
@@ -76,5 +120,17 @@ export function loadConfig(): Config {
     logLevel: process.env.AI_TODO_LOG_LEVEL ?? 'info',
     mcpHttpEnabled: (process.env.AI_TODO_MCP_HTTP ?? 'on').trim().toLowerCase() !== 'off',
     externalChannels: [],
+    wechat: {
+      // 配齐真实凭据才算启用；模拟模式只在显式打开时生效
+      enabled: (wechatAppId !== '' && wechatAppSecret !== '') || wechatMock,
+      mode: wechatMode,
+      appId: wechatAppId,
+      appSecret: wechatAppSecret,
+      redirectUri: wechatRedirectUri,
+      adminOpenids: wechatAdminOpenids,
+      autoIssueToken:
+        (process.env.AI_TODO_WECHAT_AUTO_TOKEN ?? 'on').trim().toLowerCase() !== 'off',
+      mock: wechatMock,
+    },
   };
 }

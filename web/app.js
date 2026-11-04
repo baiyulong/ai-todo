@@ -1,6 +1,7 @@
 /* AI Todo · 桌面 Web 前端（配置 A：浏览器系统级通知 + 未读列表） */
 
 import { t, setLocale, getLocale, applyI18n, LOCALES } from './i18n.js';
+import { qrSvg } from './qr.js';
 
 const state = {
   tasks: [],
@@ -15,6 +16,8 @@ const state = {
   es: null,
   drawerMode: null,
   lastToken: null,
+  /** 服务端支持的登录方式 */
+  wechat: { enabled: false, mode: 'qrconnect', mock: false },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -250,6 +253,193 @@ $('login-form').addEventListener('submit', async (e) => {
   } finally {
     submit.disabled = false;
     submit.classList.remove('is-loading');
+  }
+});
+
+/* ---------------------------------------------------------------- 微信登录 */
+
+/**
+ * 扫码登录的轮询定时器。
+ * 用递归 setTimeout 而不是 setInterval：请求慢的时候不会攒下一堆并发请求。
+ */
+let wechatTimer = null;
+
+function stopWechatPoll() {
+  if (wechatTimer) {
+    clearTimeout(wechatTimer);
+    wechatTimer = null;
+  }
+}
+
+/**
+ * 把二维码画进容器。
+ * SVG 由本地 qr.js 生成，不是外部内容；但仍然用 DOMParser 解析后 importNode
+ * 插入，不走 innerHTML——这条规矩在这个项目里是硬的。
+ */
+function renderQr(host, text) {
+  host.textContent = '';
+  let ok = false;
+  try {
+    const svg = qrSvg(text, { ecc: 'M' });
+    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+    const root = doc.documentElement;
+    if (root && root.nodeName !== 'parsererror') {
+      host.appendChild(document.importNode(root, true));
+      ok = true;
+    }
+  } catch {
+    /* 落到下面的兜底 */
+  }
+
+  // 二维码画不出来时至少留个能点开的链接，不至于把人堵死
+  const link = document.createElement('a');
+  link.className = 'qr-link';
+  link.href = text;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = ok ? t('login.wechatOpenLink') : t('login.wechatQrFailed');
+  host.appendChild(link);
+}
+
+/** 服务端支持哪些登录方式：没配 AppID 时登录页不显示微信入口 */
+async function loadAuthProviders() {
+  try {
+    const res = await api.get('/api/v1/auth/providers');
+    state.wechat = res.wechat || { enabled: false };
+  } catch {
+    state.wechat = { enabled: false };
+  }
+  const on = !!state.wechat.enabled;
+  $('login-wechat').hidden = !on;
+  $('login-wechat-sep').hidden = !on;
+  if (!on) $('login-wechat-panel').hidden = true;
+}
+
+function showLoginError(msg) {
+  const err = $('login-error');
+  err.textContent = msg;
+  err.hidden = false;
+}
+
+/** 发起扫码：拿到授权地址后画成二维码，再轮询结果 */
+async function startWechatLogin() {
+  $('login-error').hidden = true;
+  try {
+    const res = await api.get('/api/v1/auth/wechat/start');
+    $('login-wechat-panel').hidden = false;
+    $('login-wechat-token').hidden = true;
+    $('login-wechat-tip').textContent = t('login.wechatScanTip');
+    renderQr($('login-wechat-qr'), res.authorize_url);
+    pollWechatStatus(res.state, 'login');
+  } catch (err) {
+    showLoginError(translateError(err));
+  }
+}
+
+/**
+ * 轮询扫码结果。
+ * 桌面端发起、手机端授权，两台设备之间只能靠服务端中转，所以这里只能轮询。
+ */
+async function pollWechatStatus(state, purpose) {
+  const tip = purpose === 'bind' ? $('wechat-dialog-status') : $('login-wechat-tip');
+  try {
+    const res = await api.get(`/api/v1/auth/wechat/status?state=${encodeURIComponent(state)}`);
+    if (res.status === 'confirmed') {
+      stopWechatPoll();
+      if (purpose === 'bind') onWechatBound(res);
+      else onWechatSignedIn(res);
+      return;
+    }
+    if (res.status === 'expired' || res.status === 'failed' || res.status === 'unknown') {
+      stopWechatPoll();
+      tip.textContent =
+        res.status === 'expired' ? t('login.wechatExpired') : t('login.wechatFailed');
+      if (res.error_code) tip.textContent = translateError({ code: res.error_code });
+      return;
+    }
+  } catch {
+    /* 网络抖动：下一轮继续轮询，不打断用户 */
+  }
+  wechatTimer = setTimeout(() => pollWechatStatus(state, purpose), 2000);
+}
+
+/**
+ * 扫码授权成功：直接进主界面。
+ *
+ * 之前是停在登录卡片里让人手动点「进入」，体验上像「扫码了却没登录」——
+ * 扫码授权本来就该直接把人带进系统。
+ * 首次微信登录会自动签发一枚 MCP 令牌，明文只此一次，
+ * 所以用一个弹窗把它摊开给用户复制；顺带存进 state.lastToken，
+ * 设置页的 MCP 配置块就能直接用上真令牌而不是占位符。
+ */
+function onWechatSignedIn(res) {
+  const token = res.token;
+  if (token) {
+    state.lastToken = token;
+    $('token-dialog-value').textContent = token;
+  }
+  enterApp();
+  bootstrap();
+  if (token) {
+    try {
+      $('token-dialog').showModal();
+    } catch {
+      /* 对话框已经开着就算了 */
+    }
+  }
+}
+
+$('login-wechat').addEventListener('click', () => {
+  startWechatLogin();
+});
+
+$('login-wechat-cancel').addEventListener('click', () => {
+  stopWechatPoll();
+  $('login-wechat-panel').hidden = true;
+});
+
+$('token-dialog-copy').addEventListener('click', async () => {
+  const ok = await copyText($('token-dialog-value').textContent);
+  toast(ok ? t('wechat.tokenCopied') : t('wechat.tokenCopyFailed'), !ok);
+});
+
+$('token-dialog-close').addEventListener('click', () => {
+  try {
+    $('token-dialog').close();
+  } catch {
+    /* 已经关了 */
+  }
+});
+
+/** 绑定微信：把当前微信身份挂到已登录的这个账号上 */
+async function startWechatBind() {
+  try {
+    const res = await api.post('/api/v1/auth/wechat/bind/start', {});
+    $('wechat-dialog-status').textContent = t('wechat.scanTip');
+    renderQr($('wechat-dialog-qr'), res.authorize_url);
+    $('wechat-dialog').showModal();
+    pollWechatStatus(res.state, 'bind');
+  } catch (err) {
+    toast(translateError(err), true);
+  }
+}
+
+function onWechatBound() {
+  try {
+    $('wechat-dialog').close();
+  } catch {
+    /* 对话框可能已经被关掉了 */
+  }
+  toast(t('wechat.bindDone'));
+  loadMe().then(renderDrawerIfOpen);
+}
+
+$('wechat-dialog-close').addEventListener('click', () => {
+  stopWechatPoll();
+  try {
+    $('wechat-dialog').close();
+  } catch {
+    /* 已经关了 */
   }
 });
 
@@ -1042,6 +1232,28 @@ async function renderDrawer() {
   const s2 = section(t('section.account'));
   s2.appendChild(statusRow(t('status.username'), state.me?.username ?? '—', 'ok'));
   s2.appendChild(statusRow(t('status.role'), state.me?.is_admin ? t('status.roleAdmin') : t('status.roleUser'), state.me?.is_admin ? 'ok' : ''));
+
+  // 微信绑定：已登录的账号可以把自己的微信挂上来，之后就能直接扫码登录
+  if (state.wechat.enabled) {
+    const s2w = section(t('section.wechat'));
+    s2w.appendChild(
+      statusRow(
+        t('status.wechatBound'),
+        state.me?.wechat_bound ? t('status.wechatYes') : t('status.wechatNo'),
+        state.me?.wechat_bound ? 'ok' : '',
+      ),
+    );
+    const bind = document.createElement('button');
+    bind.className = 'btn btn-block';
+    bind.textContent = state.me?.wechat_bound ? t('wechat.rebind') : t('wechat.bind');
+    bind.style.marginTop = '10px';
+    bind.addEventListener('click', () => {
+      startWechatBind();
+    });
+    s2w.appendChild(bind);
+    body.appendChild(s2w);
+  }
+
   const logout = document.createElement('button');
   logout.className = 'btn btn-block';
   logout.textContent = t('topbar.logout');
@@ -1265,6 +1477,7 @@ async function usersBlock() {
     const flags = [];
     if (u.is_admin) flags.push(t('user.flagAdmin'));
     if (!u.is_active) flags.push(t('user.flagDisabled'));
+    if (u.wechat_openid) flags.push(t('user.flagWechat'));
     meta.textContent = flags.length ? flags.join(' · ') : t('user.flagNormal');
     info.appendChild(name);
     info.appendChild(meta);
@@ -1600,4 +1813,5 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------------------------------------------------------- 启动流程 */
 
+loadAuthProviders();
 tryLogin();

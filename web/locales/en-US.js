@@ -17,6 +17,16 @@ export const dict = {
   'login.hidePassword': 'Hide password',
   'login.invalidCredentials': 'Incorrect username or password',
 
+  // ---------------- WeChat scan-to-sign-in ----------------
+  'login.or': 'or',
+  'login.wechatLogin': 'Sign in with WeChat',
+  'login.wechatScanTip': 'Scan the QR code with WeChat',
+  'login.wechatCancel': 'Cancel',
+  'login.wechatExpired': 'QR code expired — please scan again',
+  'login.wechatFailed': 'WeChat sign-in failed, please try again',
+  'login.wechatOpenLink': 'Open the authorization page in a browser',
+  'login.wechatQrFailed': 'Could not render the QR code — use the link below instead',
+
   // ---------------- Top bar ----------------
   'topbar.liveStatus': 'Live connection status',
   'topbar.connecting': 'Connecting',
@@ -124,6 +134,7 @@ export const dict = {
   'section.shortcuts': 'Keyboard shortcuts',
   'section.language': 'Language',
   'section.appearance': 'General',
+  'section.wechat': 'WeChat account',
 
   'status.notifyPermission': 'Desktop notifications',
   'status.liveConnection': 'Live connection',
@@ -132,6 +143,23 @@ export const dict = {
   'status.role': 'Role',
   'status.roleAdmin': 'Administrator',
   'status.roleUser': 'Standard user',
+  'status.wechatBound': 'WeChat linked',
+  'status.wechatYes': 'Linked',
+  'status.wechatNo': 'Not linked',
+
+  // ---------------- WeChat account linking ----------------
+  'wechat.bind': 'Link WeChat',
+  'wechat.rebind': 'Link a different WeChat',
+  'wechat.bindTitle': 'Link WeChat',
+  'wechat.bindHint':
+    'Scan the QR code with WeChat to link it to this account. Once linked you can sign in by scanning, without typing a username and password.',
+  'wechat.scanTip': 'Scan the QR code with WeChat',
+  'wechat.bindDone': 'WeChat linked',
+  'wechat.tokenTitle': 'Here is your MCP access token',
+  'wechat.tokenHint': 'Shown only once — copy and save it now.',
+  'wechat.tokenCopy': 'Copy',
+  'wechat.tokenCopied': 'Copied',
+  'wechat.tokenCopyFailed': 'Copy failed — please select and copy it manually',
 
   'perm.granted': 'Allowed',
   'perm.denied': 'Denied',
@@ -177,6 +205,7 @@ export const dict = {
   'user.noUsername': '(no username)',
   'user.flagAdmin': 'Administrator',
   'user.flagDisabled': 'Disabled',
+  'user.flagWechat': 'WeChat sign-in',
   'user.flagNormal': 'Active',
   'user.disable': 'Disable',
   'user.enable': 'Enable',
@@ -232,4 +261,14 @@ export const dict = {
   'error.task_not_archived': 'Archive the task first — only archived tasks can be deleted permanently',
   'error.token_not_found': 'Token not found',
   'error.user_not_found': 'User not found',
+
+  // ---------------- WeChat sign-in ----------------
+  'error.wechat_not_configured': 'WeChat sign-in is not configured on the server',
+  'error.wechat_state_invalid': 'This sign-in request expired — please start over',
+  'error.wechat_state_expired': 'QR code expired — please scan again',
+  'error.wechat_code_invalid': 'Invalid or reused WeChat code — please scan again',
+  'error.wechat_api_error': 'WeChat API request failed — please try again later',
+  'error.wechat_already_bound': 'This WeChat account is already linked to another account',
+  'error.wechat_account_disabled': 'This account has been disabled',
+  'error.wechat_login_failed': 'WeChat sign-in failed, please try again',
 };

@@ -417,3 +417,101 @@ PGlite 是 WASM 跑的 Postgres，内存占用比原生 Postgres 大一些。生
 | `AI_TODO_WEB_DIR` | `/app/web` | 前端静态资源 |
 | `AI_TODO_BASE_URL` | 来自 `AI_TODO_PUBLIC_URL` | 通知深链接与 Cookie secure 的依据 |
 | `DATABASE_URL` | 生产版指向 `postgres:5432`；轻量版留空 | 留空 = 用 PGlite |
+
+---
+
+## 8. 微信登录
+
+### 8.1 先说清楚门槛
+
+微信扫码登录不是「填个 AppID 就能用」，它有主体资质和域名要求。**这是微信平台的规定，绕不过去**：
+
+| | 开放平台「网站应用」扫码（`qrconnect`） | 公众号网页授权（`official`） |
+|---|---|---|
+| 桌面端体验 | 最好：二维码直接扫，扫完即登录 | 授权页必须在微信客户端里打开；桌面端要靠二维码把人导到手机 |
+| 主体要求 | 企业 / 个体工商户等**组织主体**（个人主体不行） | **已认证**公众号（企业主体） |
+| 域名要求 | 已完成 **ICP 备案**的域名，且**备案主体与开放平台主体一致** | 已备案域名 |
+| 其他 | 需支付 300 元认证费并通过审核 | 公众号本身需完成认证 |
+| 接口 | `connect/qrconnect`，scope `snsapi_login` | `connect/oauth2/authorize`，scope `snsapi_userinfo` |
+
+两条路线的**换 token 接口完全一样**（`sns/oauth2/access_token` + `sns/userinfo`），所以服务端只实现了一次，用 `AI_TODO_WECHAT_MODE` 切换。
+
+**关键澄清**：受「必须是备案域名」限制的**只有回调地址**。真实扫码时二维码里编码的是 `open.weixin.qq.com` 的授权地址，手机当然能打开；受限制的是「授权成功后微信回到你的服务器」那一步——那时你的服务器必须有一个微信认可的真实域名。
+
+如果两条路线你都走不通（个人主体、没备案域名），**密码登录仍然完整可用**，微信登录只是一个可选入口。
+
+### 8.2 配置步骤
+
+**第一步：微信侧准备**
+
+1. 登录[微信开放平台](https://open.weixin.qq.com/)（网站应用）或公众号后台；
+2. 找到 AppID 与 AppSecret；
+3. 在「授权回调域名」里登记你的域名，例如 `todo.example.com`（只填域名，不带路径、不带协议）。
+
+**第二步：服务端配置**
+
+```bash
+# .env
+AI_TODO_WECHAT_APPID=wx1234567890abcdef
+AI_TODO_WECHAT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AI_TODO_WECHAT_MODE=qrconnect          # qrconnect（网站应用）| official（公众号）
+AI_TODO_WECHAT_REDIRECT_URI=https://todo.example.com/api/v1/auth/wechat/callback
+AI_TODO_WECHAT_ADMIN_OPENIDS=oABCDEF0123456789,oFEDCBA9876543210
+AI_TODO_PUBLIC_URL=https://todo.example.com
+```
+
+`AI_TODO_WECHAT_REDIRECT_URI` 留空时用 `AI_TODO_BASE_URL` + `/api/v1/auth/wechat/callback`，两者要和微信后台登记的一致，否则微信会报「redirect_uri 域名与后台配置不一致」。
+
+**第三步：重启并确认**
+
+```powershell
+docker compose up -d --build app
+# 登录页应当出现「微信登录」入口
+```
+
+未配置 AppID 时登录页**不显示**微信入口——这是刻意的：一个永远点了没反应的按钮比没有更糟。
+
+### 8.3 账号怎么对应
+
+| 场景 | 结果 |
+|---|---|
+| 微信身份（openid）已有账号 | 直接登进那个账号 |
+| 微信身份第一次来 | 自动建号，并签发一枚 MCP 访问令牌（弹窗里复制，只显示一次） |
+| 已有账号想改用微信登录 | 「设置 → 绑定微信」扫码绑定，历史任务、令牌、规则全保留 |
+| 一个微信被两个账号绑定 | 第二次被拒绝（`wechat_already_bound`） |
+| 账号被管理员禁用 | 微信扫码同样登不进去 |
+| openid 在 `AI_TODO_WECHAT_ADMIN_OPENIDS` 里 | 该微信登录后**立即获得管理员权限**，改完环境变量重启即生效 |
+| 库里一个管理员都没有 | 第一个微信登录的人自动成为管理员（防止把自己锁死） |
+
+### 8.4 不想重建账号：从「绑定微信」开始
+
+接微信登录**不需要重建账号**。先照常用密码登录，进「设置 → 绑定微信」，扫一次码，这个微信就挂到当前账号上了。管理员把自己常用的微信绑上之后，日常就用扫码登录。
+
+### 8.5 模拟模式（本地没 AppID 也能看效果）
+
+```bash
+AI_TODO_WECHAT_MOCK=on
+```
+
+它不连微信官方接口，用本地假 openid 跑完整条链路：发起扫码 → 授权页 → 回调 → 建号 → 签发令牌 → 登录。
+
+- **生产环境务必关掉**：开着它，任何人都能用假身份登录你的服务。
+- 想用**手机扫**体验完整流程，必须让地址对手机可达：把 `AI_TODO_BASE_URL` / `AI_TODO_PUBLIC_URL` 设成局域网地址，例如 `http://192.168.1.20:8787`。用 `127.0.0.1` 的话，手机扫到的是**手机自己的** 127.0.0.1，打不开（服务端启动日志也会提醒你这一点）。
+- 模拟授权页上可以自己填 openid 与昵称，方便验证「同一微信复用账号」「换绑后原微信独立成号」这类行为。
+
+### 8.6 常见问题
+
+**Q：扫码后手机端显示「redirect_uri 域名与后台配置不一致」**
+后台登记的是域名（不带 `https://`、不带路径），而 `AI_TODO_WECHAT_REDIRECT_URI` 要带完整协议与路径。两者按微信的规则各自填写，不要互相迁就。
+
+**Q：扫码后一直转圈进不去**
+多半是手机端授权成功了、但桌面端的轮询没拿到结果。检查：
+1. 桌面端与服务端之间是否通（局域网访问时服务端要监听 `0.0.0.0`）；
+2. 浏览器控制台里 `GET /api/v1/auth/wechat/status` 的返回是不是 `confirmed`；
+3. 服务端日志里有没有 `微信回调失败：xxx`（会带上具体错误码，如 `wechat_code_invalid` 表示 code 已被用过，重新扫码即可）。
+
+**Q：微信 AppSecret 放哪里**
+只放环境变量（`.env` 或 compose 的 `environment`），不要写进代码、不要提交进仓库。服务端不会把它回显给前端。
+
+**Q：会不会因为「一个微信只能对应一个账号」而绑错**
+绑定前先确认这个微信是不是已经绑到别的账号了：管理员在「设置 → 用户管理」里能看到每个账号的登录方式标记。

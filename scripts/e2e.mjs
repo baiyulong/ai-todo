@@ -23,9 +23,11 @@
  *  14. 通知聚合的账号隔离（不串用户）；账号在窗口期内被删除后服务不崩
  *  15. 彻底删除：只能删已归档的任务、跨用户删不掉、非法 UUID 返回 400
  *  16. 批量清空已归档：只清自己的、不动未归档的任务
+ *  17. 微信登录：发起扫码 → 授权回调 → 桌面端取回会话 → 账号映射与绑定
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -155,6 +157,60 @@ class SseClient {
       /* ignore */
     }
   }
+}
+
+/* --------------------------------------------------------------- 微信模拟实例 */
+
+/**
+ * 拉起一个开了模拟模式的隔离实例，用来端到端跑微信登录。
+ *
+ * 不用主实例：模拟模式等于把「谁能登录」彻底放开，不能碰到真实数据，
+ * 也不能在真实用户的库里建出一堆假账号。所以另起进程 + 另起数据目录。
+ */
+async function startMockWechatServer() {
+  const entry = join(root, 'dist', 'src', 'cli.js');
+  if (!existsSync(entry)) return null;
+
+  const port = 8900 + Math.floor(Math.random() * 90);
+  const dataDir = join(root, 'data', 'tmp', `e2e-wechat-${Date.now().toString(36)}`);
+  mkdirSync(dataDir, { recursive: true });
+
+  const child = spawn(process.execPath, [entry, 'serve'], {
+    cwd: root,
+    env: {
+      ...process.env,
+      AI_TODO_PORT: String(port),
+      AI_TODO_HOST: '127.0.0.1',
+      AI_TODO_DATA_DIR: dataDir,
+      AI_TODO_WECHAT_MOCK: 'on',
+      AI_TODO_LOG_LEVEL: 'error',
+    },
+    stdio: 'ignore',
+  });
+
+  const base = `http://127.0.0.1:${port}`;
+  for (let i = 0; i < 60; i++) {
+    await sleep(500);
+    try {
+      const res = await fetch(`${base}/api/v1/health`);
+      if (res.ok) return { base, child, dataDir };
+    } catch {
+      /* 还没起来 */
+    }
+    if (child.exitCode !== null) break;
+  }
+
+  try {
+    child.kill();
+  } catch {
+    /* ignore */
+  }
+  try {
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 5 });
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ 主流程 */
@@ -1243,6 +1299,254 @@ async function main() {
   // 清理这两条来源测试任务
   for (const s of srcTasks) {
     await userApi(`/api/v1/tasks/${s.taskId}/archive`, { method: 'POST' });
+  }
+
+  /* ------------------------------------------------- 微信登录 */
+
+  console.log('\n[11] 微信登录');
+
+  // 静态检查：二维码必须由本地模块生成，不能依赖外部图片服务
+  check('登录页有微信登录入口', /id="login-wechat"/.test(indexHtml), '没有 #login-wechat 按钮');
+  check('前端引入了本地二维码模块', /from '\.\/qr\.js'/.test(appJs), 'app.js 没有 import qr.js');
+  check(
+    '存在零依赖的二维码实现',
+    existsSync(join(root, 'web', 'qr.js')),
+    '缺少 web/qr.js，扫码面板画不出二维码',
+  );
+  check(
+    '二维码用 DOMParser 插入而不是 innerHTML',
+    /DOMParser/.test(appJs) && !/innerHTML/.test(appJs),
+    'innerHTML 不该出现在这个项目里：外部内容可能被当成 HTML 执行',
+  );
+
+  // 主实例支持哪些登录方式（没配 AppID 时应该是关闭的）
+  const providers = await fetch(`${BASE}/api/v1/auth/providers`).then((r) => r.json());
+  check('登录方式接口可用', !!providers.wechat, JSON.stringify(providers));
+  check(
+    'wechat.enabled 是布尔值',
+    typeof providers.wechat?.enabled === 'boolean',
+    JSON.stringify(providers.wechat),
+  );
+
+  // 端到端跑一遍扫码登录：自己拉一个开了模拟模式的隔离实例
+  const mock = await startMockWechatServer();
+  if (!mock) {
+    console.log('  （跳过端到端扫码流程：模拟实例没起来）');
+  } else {
+    try {
+      const prov = await fetch(`${mock.base}/api/v1/auth/providers`).then((r) => r.json());
+      check('模拟实例开启了微信登录', prov.wechat?.enabled === true, JSON.stringify(prov));
+      check('模拟实例标记为 mock', prov.wechat?.mock === true, JSON.stringify(prov));
+
+      // 发起扫码
+      const startRes = await fetch(`${mock.base}/api/v1/auth/wechat/start`);
+      const start = await startRes.json();
+      check('发起扫码返回 200', startRes.status === 200, `HTTP ${startRes.status}`);
+      check(
+        '扫码 state 是 64 位随机十六进制',
+        /^[0-9a-f]{64}$/.test(start.state || ''),
+        String(start.state),
+      );
+      check(
+        '返回了带 state 的授权地址',
+        typeof start.authorize_url === 'string' && start.authorize_url.includes('state='),
+        String(start.authorize_url),
+      );
+
+      // 乱猜的 state 不能被当成已登录
+      const unknown = await fetch(
+        `${mock.base}/api/v1/auth/wechat/status?state=${'0'.repeat(64)}`,
+      ).then((r) => r.json());
+      check('未知 state 不会被当成已登录', unknown.status === 'unknown', JSON.stringify(unknown));
+
+      // 模拟授权页
+      const page = await fetch(start.authorize_url);
+      const html = await page.text();
+      check('模拟授权页可访问', page.status === 200, `HTTP ${page.status}`);
+      check('模拟授权页有授权按钮', html.includes('允许登录'), '页面里没有授权按钮');
+
+      // 确认授权
+      const confirm = await fetch(`${mock.base}/api/v1/auth/wechat/mock/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          state: start.state,
+          openid: 'e2e-openid-a',
+          nickname: 'E2E 微信用户',
+        }),
+      });
+      check('模拟授权确认成功', confirm.status === 200, `HTTP ${confirm.status}`);
+
+      // 表单编码提交：浏览器里的模拟授权页是个 <form method="post">，
+      // 提交的是 application/x-www-form-urlencoded。服务端注册了
+      // addContentTypeParser('*', { parseAs: 'string' })，这类 body 是字符串而不是对象——
+      // 按对象读会拿到 undefined，授权流程直接断掉。这条用例专门盯这个坑。
+      const formStart = await fetch(`${mock.base}/api/v1/auth/wechat/start`).then((r) => r.json());
+      const formBody = new URLSearchParams({
+        state: formStart.state,
+        openid: 'e2e-openid-form',
+        nickname: 'E2E 表单用户',
+      }).toString();
+      const formConfirm = await fetch(`${mock.base}/api/v1/auth/wechat/mock/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: formBody,
+      });
+      check(
+        '表单编码提交（模拟授权页的真实提交方式）也能完成授权',
+        formConfirm.status === 200,
+        `HTTP ${formConfirm.status}`,
+      );
+      const formStatus = await fetch(
+        `${mock.base}/api/v1/auth/wechat/status?state=${formStart.state}`,
+      ).then((r) => r.json());
+      check(
+        '表单编码提交后轮询到授权成功',
+        formStatus.status === 'confirmed',
+        JSON.stringify(formStatus),
+      );
+      check(
+        '表单编码提交建出的账号昵称取自表单',
+        formStatus.user?.display_name === 'E2E 表单用户',
+        JSON.stringify(formStatus.user),
+      );
+
+      // 桌面端轮询取回会话
+      const statusRes = await fetch(
+        `${mock.base}/api/v1/auth/wechat/status?state=${start.state}`,
+      );
+      const status = await statusRes.json();
+      check('轮询到授权成功', status.status === 'confirmed', JSON.stringify(status));
+      const setCookie = statusRes.headers.get('set-cookie') || '';
+      check('轮询响应签发了会话 Cookie', setCookie.includes('ai_todo_session='), setCookie);
+      check(
+        '首次微信登录自动签发了 MCP 令牌',
+        typeof status.token === 'string' && status.token.startsWith('ait_'),
+        String(status.token),
+      );
+      check(
+        '账号昵称取自微信资料',
+        status.user?.display_name === 'E2E 微信用户',
+        JSON.stringify(status.user),
+      );
+
+      // 拿到的 Cookie 能访问受保护接口
+      const cookie = setCookie.split(';')[0];
+      const me = await fetch(`${mock.base}/api/v1/me`, { headers: { cookie } }).then((r) => r.json());
+      check('会话 Cookie 可以访问 /api/v1/me', !!me.user_id, JSON.stringify(me).slice(0, 160));
+      check('账号标记为已绑定微信', me.wechat_bound === true, JSON.stringify(me.wechat_bound));
+
+      // 自动签发的令牌可以直接用
+      const tokRes = await fetch(`${mock.base}/api/v1/tasks?limit=1`, {
+        headers: { authorization: `Bearer ${status.token}` },
+      });
+      check('自动签发的令牌可以调 API', tokRes.status === 200, `HTTP ${tokRes.status}`);
+
+      // 同一个微信再登一次：复用账号，不重复签发令牌
+      const start2 = await fetch(`${mock.base}/api/v1/auth/wechat/start`).then((r) => r.json());
+      await fetch(`${mock.base}/api/v1/auth/wechat/mock/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          state: start2.state,
+          openid: 'e2e-openid-a',
+          nickname: 'E2E 微信用户',
+        }),
+      });
+      const status2 = await fetch(
+        `${mock.base}/api/v1/auth/wechat/status?state=${start2.state}`,
+      ).then((r) => r.json());
+      check(
+        '同一个微信再次登录复用同一账号',
+        status2.user?.id === status.user?.id,
+        `${status2.user?.id} vs ${status.user?.id}`,
+      );
+      check('老账号再次登录不重复签发令牌', !status2.token, String(status2.token));
+
+      // 绑定：把另一个微信绑到当前账号
+      const bindNoAuth = await fetch(`${mock.base}/api/v1/auth/wechat/bind/start`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      check('未登录不能发起绑定', bindNoAuth.status === 401, `HTTP ${bindNoAuth.status}`);
+
+      const bindRes = await fetch(`${mock.base}/api/v1/auth/wechat/bind/start`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: '{}',
+      });
+      const bind = await bindRes.json();
+      check('已登录可以发起绑定', bindRes.status === 200 && !!bind.state, `HTTP ${bindRes.status}`);
+
+      await fetch(`${mock.base}/api/v1/auth/wechat/mock/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          state: bind.state,
+          openid: 'e2e-openid-b',
+          nickname: 'E2E 微信用户',
+        }),
+      });
+      const bindStatus = await fetch(
+        `${mock.base}/api/v1/auth/wechat/status?state=${bind.state}`,
+      ).then((r) => r.json());
+      check(
+        '绑定流程确认成功',
+        bindStatus.status === 'confirmed' && bindStatus.purpose === 'bind',
+        JSON.stringify(bindStatus),
+      );
+      const me2 = await fetch(`${mock.base}/api/v1/me`, { headers: { cookie } }).then((r) => r.json());
+      check('绑定后还是同一个账号', me2.user_id === me.user_id, `${me2.user_id} vs ${me.user_id}`);
+
+      // 已被别人占用的微信不能再绑走
+      const start3 = await fetch(`${mock.base}/api/v1/auth/wechat/start`).then((r) => r.json());
+      await fetch(`${mock.base}/api/v1/auth/wechat/mock/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          state: start3.state,
+          openid: 'e2e-openid-a',
+          nickname: '另一个微信',
+        }),
+      });
+      const status3 = await fetch(
+        `${mock.base}/api/v1/auth/wechat/status?state=${start3.state}`,
+      ).then((r) => r.json());
+      check(
+        '换绑后原微信会变成独立账号',
+        status3.user?.id && status3.user?.id !== status.user?.id,
+        `${status3.user?.id} vs ${status.user?.id}`,
+      );
+
+      const bind2 = await fetch(`${mock.base}/api/v1/auth/wechat/bind/start`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: '{}',
+      }).then((r) => r.json());
+      const conflict = await fetch(`${mock.base}/api/v1/auth/wechat/mock/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          state: bind2.state,
+          openid: 'e2e-openid-a',
+          nickname: '占用者',
+        }),
+      });
+      check('已被占用的微信不能绑到别的账号', conflict.status === 400, `HTTP ${conflict.status}`);
+    } finally {
+      try {
+        mock.child.kill();
+      } catch {
+        /* 已经退了 */
+      }
+      await sleep(300);
+      try {
+        rmSync(mock.dataDir, { recursive: true, force: true, maxRetries: 5 });
+      } catch {
+        /* 临时目录删不掉就算了，不影响结论 */
+      }
+    }
   }
 
   /* 清理 */
