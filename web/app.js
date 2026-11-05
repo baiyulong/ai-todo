@@ -1342,7 +1342,7 @@ $('login-locale').addEventListener('click', () => {
 /**
  * 语言切换后的重绘。
  * i18n.js 已经套好了 HTML 上的静态文案，这里负责那些运行时才生成的内容：
- * 任务卡片、顶栏状态、设置抽屉。
+ * 任务卡片、顶栏状态、设置抽屉、用户/令牌管理页面。
  */
 window.addEventListener('ai-todo:localechange', () => {
   renderTasks();
@@ -1352,6 +1352,9 @@ window.addEventListener('ai-todo:localechange', () => {
   renderDrawerIfOpen();
   // 下拉里的「全部来源」是 JS 生成的，得跟着语言重画
   renderSourceFilter();
+  // 当前停在管理页的话整页重绘，别让表头按钮还挂着旧语言
+  if (state.view === 'users') renderUsersPage();
+  if (state.view === 'tokens') renderTokensPage();
 });
 
 function renderDrawerIfOpen() {
