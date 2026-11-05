@@ -225,6 +225,17 @@ async function doReply() {
             {{ t('task.transfer') }}
           </button>
         </span>
+
+        <!-- 回复：放在转交后面，回复即完成 -->
+        <button
+          v-if="task.status === 'pending' || task.status === 'acked'"
+          class="btn btn-primary"
+          type="button"
+          :disabled="!replyText.trim()"
+          @click.stop="doReply"
+        >
+          {{ t('task.reply') }}
+        </button>
       </div>
 
       <!-- 贪睡预设行 -->
@@ -238,7 +249,7 @@ async function doReply() {
         >{{ label }}</button>
       </div>
 
-      <!-- 回复输入：多行文本框，Ctrl/Cmd+Enter 或按钮提交；回复后任务标记完成，等待中的 AI 会立刻收到 -->
+      <!-- 回复输入：多行文本框，Ctrl/Cmd+Enter 或操作行里的回复按钮提交；回复后任务标记完成，等待中的 AI 会立刻收到 -->
       <div v-if="task.status === 'pending' || task.status === 'acked'" class="task-reply-row">
         <textarea
           v-model="replyText"
@@ -250,9 +261,6 @@ async function doReply() {
           @keydown.ctrl.enter.prevent="doReply"
           @keydown.meta.enter.prevent="doReply"
         ></textarea>
-        <button class="btn btn-primary" type="button" :disabled="!replyText.trim()" @click="doReply">
-          {{ t('task.reply') }}
-        </button>
       </div>
     </template>
   </article>
