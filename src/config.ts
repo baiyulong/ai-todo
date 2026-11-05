@@ -166,7 +166,9 @@ export function loadConfig(): Config {
     databaseUrl,
     pgliteDir: resolve(dataDir, 'pgdata'),
     dataDir,
-    webDir: resolve(packageRoot, process.env.AI_TODO_WEB_DIR ?? 'web'),
+    // Vue 前端的构建产物（frontend/ 经 Vite 构建得到）。
+    // 旧目录 web/ 已由 frontend/ 取代；Docker 里仍是 /app/web（镜像内路径不变）。
+    webDir: resolve(packageRoot, process.env.AI_TODO_WEB_DIR ?? 'frontend/dist'),
     cookieName: 'ai_todo_session',
     sessionTtlDays: Number(process.env.AI_TODO_SESSION_TTL_DAYS ?? 30),
     logLevel: process.env.AI_TODO_LOG_LEVEL ?? 'info',

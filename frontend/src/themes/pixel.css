@@ -1,0 +1,131 @@
+/* ============================================================
+   主题 · pixel · 8-bit 复古游戏机
+   ------------------------------------------------------------
+   像素字体（CDN 加载，失败回退等宽字体）、0 圆角、硬黑边框、
+   无模糊的像素化阴影、GameBoy 式配色。
+   ============================================================ */
+
+/* 像素字体：中文「Zpix / 缝合像素」+ 英文 Press Start 2P。
+   CDN 加载失败时回退到 var(--sans)，不阻塞、不白屏。 */
+@font-face {
+  font-family: 'Pixel zh';
+  src: url('https://cdn.jsdelivr.net/gh/SolidZORO/zpix-pixel-font@master/dist/Zpix.ttf') format('truetype');
+  font-display: swap;
+  unicode-range: U+4E00-9FFF, U+3000-303F, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Pixel en';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/press-start-2p@5.0.0/files/press-start-2p-latin-400-normal.woff2') format('woff2');
+  font-display: swap;
+}
+
+[data-theme='pixel'] {
+  color-scheme: dark;
+
+  --bg: #1a1c2c;
+  --surface: #24283e;
+  --surface-2: #2f3350;
+  --topbar-bg: #1a1c2c;
+  --drawer-bg: #20223a;
+  --dropdown-bg: #2f3350;
+  --border: #0f0f1b;
+  --border-strong: #565f89;
+  --text: #e8e7ff;
+  --text-2: #a9b1d6;
+  --muted: #6b7089;
+
+  --accent: #ffd76a;
+  --accent-hover: #ffe490;
+  --accent-contrast: #1a1c2c;
+  --accent-soft: rgba(255, 215, 106, 0.16);
+
+  --danger: #ff5d8f;
+  --danger-soft: rgba(255, 93, 143, 0.18);
+  --warn: #ffb347;
+  --warn-soft: rgba(255, 179, 71, 0.18);
+  --ok: #78dcae;
+  --ok-soft: rgba(120, 220, 174, 0.16);
+  --info: #8ea6ff;
+  --info-soft: rgba(142, 166, 255, 0.16);
+
+  --toast-bg: #ffd76a;
+  --toast-fg: #1a1c2c;
+  --code-bg: #0f0f1b;
+  --code-fg: #78dcae;
+
+  /* 无模糊：像素世界里没有羽化的阴影 */
+  --shadow-sm: 3px 3px 0 #0f0f1b;
+  --shadow-md: 4px 4px 0 #0f0f1b;
+  --shadow-lg: 6px 6px 0 #0f0f1b;
+
+  --radius: 0px;
+  --radius-lg: 0px;
+
+  --backdrop: none;
+
+  --sans: 'Pixel zh', 'Pixel en', 'Zpix', ui-monospace, 'SimSun', monospace;
+  --mono: 'Pixel en', ui-monospace, monospace;
+  --pixel-font: 'Pixel en', 'Pixel zh', monospace;
+}
+
+/* 像素世界：边框一律加粗拉直，交互元素方正硬朗 */
+[data-theme='pixel'] .topbar,
+[data-theme='pixel'] .drawer,
+[data-theme='pixel'] .dialog,
+[data-theme='pixel'] .user-dropdown {
+  border-width: 2px;
+}
+[data-theme='pixel'] .task,
+[data-theme='pixel'] .mgmt-card,
+[data-theme='pixel'] .login-card,
+[data-theme='pixel'] .banner,
+[data-theme='pixel'] .theme-option {
+  border-width: 2px;
+}
+[data-theme='pixel'] .task { border-left-width: 4px; }
+[data-theme='pixel'] .tab.is-active,
+[data-theme='pixel'] .btn,
+[data-theme='pixel'] .fab {
+  box-shadow: var(--shadow-sm);
+}
+[data-theme='pixel'] .btn,
+[data-theme='pixel'] .tab,
+[data-theme='pixel'] .input,
+[data-theme='pixel'] .select,
+[data-theme='pixel'] .tag,
+[data-theme='pixel'] .src-chip,
+[data-theme='pixel'] .fab {
+  border-radius: 0;
+}
+[data-theme='pixel'] .fab { border-radius: 0; }
+[data-theme='pixel'] .avatar,
+[data-theme='pixel'] .user-chip,
+[data-theme='pixel'] .icon-btn,
+[data-theme='pixel'] .field-toggle,
+[data-theme='pixel'] .task-del {
+  border-radius: 0;
+}
+[data-theme='pixel'] .toast { border-radius: 0; border: 2px solid #0f0f1b; }
+[data-theme='pixel'] .pending-pill { border-radius: 0; border: 2px solid #0f0f1b; }
+[data-theme='pixel'] .live-dot i { border-radius: 0; }
+[data-theme='pixel'] .brand,
+[data-theme='pixel'] .task-title,
+[data-theme='pixel'] h1, [data-theme='pixel'] h2, [data-theme='pixel'] h3 {
+  letter-spacing: 0.03em;
+}
+[data-theme='pixel'] .btn:active,
+[data-theme='pixel'] .fab:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+/* 关闭毛玻璃的模糊（backdrop-filter: none） */
+[data-theme='pixel'] .topbar,
+[data-theme='pixel'] .drawer,
+[data-theme='pixel'] .user-dropdown {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme='pixel'] .login-mark { border-radius: 0; border: 2px solid #0f0f1b; }
+[data-theme='pixel'] .spinner { border-width: 3px; border-radius: 0; }
+[data-theme='pixel'] .drawer { animation: none; }
+[data-theme='pixel'] .toast { animation: none; }

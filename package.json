@@ -21,7 +21,9 @@
     "cloud": "node dist/src/cli.js cloud",
     "test": "npm run build && node --test dist/test/*.test.js",
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
-    "deploy:web": "tcb hosting deploy web/ -e sure-vole-d0gfdy5aj5daeaa3b --verify --ignore index.html"
+    "web:dev": "npm run dev --prefix frontend",
+    "web:build": "npm run build --prefix frontend",
+    "deploy:web": "tcb hosting deploy frontend/dist -e sure-vole-d0gfdy5aj5daeaa3b --verify --ignore index.html"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^3.11.0",

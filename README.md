@@ -430,7 +430,7 @@ stdio 形态（客户端与服务端同一台机器）用环境变量：
 | 记住选择 | 切过的语言写进 `localStorage`，刷新、重开浏览器都保持 |
 | 错误消息也翻译 | 服务端返回稳定的 `error code`（如 `invalid_credentials`），界面按 code 查字典翻译，不依赖服务端文案 |
 
-语言包在 `web/locales/`。新增语言只要加一个 `xx-XX.js`，再在 `web/i18n.js` 里登记一下，**前端代码一行都不用改**。
+语言包在 `frontend/src/locales/`。新增语言只要加一个 `xx-XX.js`，再在 `frontend/src/i18n.js` 里登记一下，**前端代码一行都不用改**。
 
 > 服务端返回的 `message` 仍然是中文——那是给命令行和日志看的。界面永远按 `code` 翻译成当前语言。
 
@@ -463,17 +463,21 @@ src/
     client.ts        REST 客户端
     server.ts        MCP Server 实现（7 个工具 + 1 个资源，stdio / HTTP 共用）
     http.ts          远程 MCP 端点（Streamable HTTP，无状态 + Bearer PAT）
-web/
-  index.html         应用壳
-  styles.css         亮/暗双主题
-  app.js             登录、列表、筛选、SSE、通知、令牌与用户管理
-  i18n.js            轻量 i18n 引擎（t() / 语言检测 / 持久化 / DOM 套用）
-  locales/
-    zh-CN.js         简体中文语言包
-    en-US.js         English language pack
-  sw.js              Service Worker（应用壳缓存 + 通知点击处理）
-  manifest.webmanifest
-  icon.svg
+frontend/
+  index.html         Vite 入口（含语言/主题防闪烁预置脚本）
+  vite.config.js     Vite 配置（dev 代理 /api 与 /mcp 到后端）
+  public/            云备份独立页、图标、manifest、sw.js
+  src/
+    main.js / App.vue   应用入口与根组件（登录态分流、SSE、快捷键）
+    api.js              fetch 封装（错误按 code 翻译）
+    i18n.js             轻量 i18n 引擎（t() / 语言检测 / 持久化，响应式）
+    stores/             Pinia：session / tasks / ui
+    composables/        通知（声音+桌面通知）、剪贴板
+    components/         登录、任务、用户与令牌管理、设置抽屉、对话框
+    styles/ themes/     基础样式 + 三主题（Apple 风 / 像素 / 黑客）
+    locales/
+      zh-CN.js          简体中文语言包
+      en-US.js          English language pack
 scripts/
   e2e.mjs            端到端验证脚本（151 项检查）
   mcp-http-check.mjs 远程 MCP 连通性自检（会真的建一条任务再归档掉）
@@ -501,7 +505,7 @@ docs/
 | `AI_TODO_HOST` | `127.0.0.1` | 监听地址（`0.0.0.0` 可对外暴露） |
 | `AI_TODO_BASE_URL` | `http://127.0.0.1:8787` | 生成通知链接用；HTTPS 时会话 Cookie 自动加 `secure` |
 | `AI_TODO_DATA_DIR` | `data` | 凭据文件与 PGlite 数据目录 |
-| `AI_TODO_WEB_DIR` | `web` | 前端静态目录 |
+| `AI_TODO_WEB_DIR` | `frontend/dist` | 前端静态目录（Vite 构建产物） |
 | `AI_TODO_SESSION_TTL_DAYS` | `30` | 会话 Cookie 有效期 |
 | `AI_TODO_LOG_LEVEL` | `info` | 日志级别 |
 | `AI_TODO_MCP_HTTP` | `on` | 远程 MCP 端点（`POST /mcp`）；设为 `off` 关闭 |

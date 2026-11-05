@@ -1,6 +1,8 @@
 # 依赖与构建产物：镜像内会重新安装 / 编译
 node_modules
 dist
+frontend/dist
+frontend/node_modules
 *.tsbuildinfo
 
 # 运行时数据：数据库文件、管理员凭据、令牌、日志一律不进镜像

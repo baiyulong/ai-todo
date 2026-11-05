@@ -1,24 +1,25 @@
 /* AI Todo Service Worker
  *
  * 职责：
- *   1. 缓存应用壳（HTML / CSS / JS / 图标），让 PWA 离线时仍能打开、仍能注册通知
+ *   1. 缓存应用壳（HTML / 图标 / manifest），让 PWA 离线时仍能打开、仍能注册通知
  *   2. API 请求一律不缓存（尤其 SSE 流不能被代理，否则实时性就没了）
  *   3. 处理 notificationclick：点横幅时聚焦已打开的 AI Todo 窗口，没有就新开一个
  *
  * 注意：Service Worker 是本方案「持久系统级通知」的关键路径。
  * 前端优先用 registration.showNotification() 发通知——它能产生真正的系统级横幅，
  * 且不受页面被浏览器冻结（freezing）的影响；拿不到 SW 时才回退到 new Notification()。
+ *
+ * Vite 产物带内容 hash，静态资源本来就是「改版即换名」，所以这里只预缓存
+ * 入口文档与图标；JS/CSS 走网络优先、失败回退缓存（见 handleAsset）。
  */
 
 // 资源版本号：应用壳有变更时 +1。
-// activate 事件会删掉所有旧版本的 shell 缓存，避免拿到上一版的 app.js / styles.css。
-const SHELL_CACHE = 'ai-todo-shell-v2';
+// activate 事件会删掉所有旧版本的 shell 缓存，避免拿到上一版的应用壳。
+const SHELL_CACHE = 'ai-todo-shell-v3';
 
 const SHELL_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css',
-  '/app.js',
   '/icon.svg',
   '/manifest.webmanifest',
 ];
@@ -75,7 +76,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 静态资源：cache-first（快），后台顺带更新（stale-while-revalidate）
+  // 静态资源：network-first，失败回退缓存
   event.respondWith(handleAsset(req));
 });
 
@@ -107,7 +108,7 @@ async function handleNavigate(req) {
  * 静态资源：network-first，失败回退缓存。
  *
  * 为什么不用 cache-first：应用壳改过之后，用户第一次刷新拿到的是旧缓存里的
- * app.js / styles.css，要刷新第二次才看到新版。常驻的 PWA 标签页可能因此
+ * JS / CSS，要刷新第二次才看到新版。常驻的 PWA 标签页可能因此
  * 一直停留在旧界面上，还以为改了没生效。
  * 本应用跑在 localhost，网络优先几乎没有延迟代价，而「界面永远是最新的」
  * 正是这类常驻工具该有的行为；断网时回退缓存，功能不受影响。

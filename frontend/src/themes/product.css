@@ -1,0 +1,99 @@
+/* ============================================================
+   主题 · product（默认）· Apple 风格
+   ------------------------------------------------------------
+   SF 系统字体栈、大圆角、毛玻璃材质、iOS 系统色。
+   明暗跟随系统 prefers-color-scheme。
+   ============================================================ */
+
+:root,
+[data-theme='product'] {
+  --bg: #f5f5f7;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-2: #f2f2f7;
+  --topbar-bg: rgba(245, 245, 247, 0.72);
+  --drawer-bg: rgba(248, 248, 250, 0.85);
+  --dropdown-bg: rgba(250, 250, 252, 0.88);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --text: #1d1d1f;
+  --text-2: #424245;
+  --muted: #86868b;
+
+  --accent: #007aff;
+  --accent-hover: #0a84ff;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+
+  --danger: #ff3b30;
+  --danger-soft: rgba(255, 59, 48, 0.12);
+  --warn: #ff9500;
+  --warn-soft: rgba(255, 149, 0, 0.14);
+  --ok: #34c759;
+  --ok-soft: rgba(52, 199, 89, 0.14);
+  --info: #5e5ce6;
+  --info-soft: rgba(94, 92, 230, 0.12);
+
+  --toast-bg: rgba(29, 29, 31, 0.92);
+  --toast-fg: #f5f5f7;
+  --code-bg: #1d1d1f;
+  --code-fg: #f5f5f7;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 6px 20px -4px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 20px 60px -12px rgba(0, 0, 0, 0.28);
+
+  --radius: 14px;
+  --radius-lg: 20px;
+
+  --backdrop: saturate(1.8) blur(20px);
+
+  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --pixel-font: var(--sans);
+}
+
+[data-theme='product'] {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  [data-theme='product'] {
+    --bg: #1c1c1e;
+    --surface: rgba(28, 28, 30, 0.92);
+    --surface-2: #2c2c2e;
+    --topbar-bg: rgba(28, 28, 30, 0.72);
+    --drawer-bg: rgba(24, 24, 26, 0.88);
+    --dropdown-bg: rgba(44, 44, 46, 0.92);
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --text: #f5f5f7;
+    --text-2: #d1d1d6;
+    --muted: #98989d;
+
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --accent-soft: rgba(10, 132, 255, 0.18);
+
+    --danger: #ff453a;
+    --danger-soft: rgba(255, 69, 58, 0.16);
+    --warn: #ff9f0a;
+    --warn-soft: rgba(255, 159, 10, 0.16);
+    --ok: #30d158;
+    --ok-soft: rgba(48, 209, 88, 0.16);
+    --info: #7d7aff;
+    --info-soft: rgba(125, 122, 255, 0.16);
+
+    --toast-bg: rgba(58, 58, 60, 0.95);
+    --toast-fg: #f5f5f7;
+    --code-bg: #000000;
+    --code-fg: #30d158;
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 20px -4px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 20px 60px -12px rgba(0, 0, 0, 0.7);
+  }
+
+  [data-theme='product'] { color-scheme: dark; }
+}

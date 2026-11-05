@@ -138,6 +138,13 @@ export const dict = {
   'section.mcp': 'MCP setup',
   'section.shortcuts': 'Keyboard shortcuts',
   'section.language': 'Language',
+  'section.theme': 'Theme',
+  'theme.product': 'Product · Apple',
+  'theme.productDesc': 'Frosted glass, iOS system colors, clean default UI',
+  'theme.pixel': 'Pixel',
+  'theme.pixelDesc': '8-bit retro console, hard borders, pixel fonts',
+  'theme.hacker': 'Hacker',
+  'theme.hackerDesc': 'Pure black terminal, phosphor green, CRT scanlines',
   'section.appearance': 'General',
   'section.wechat': 'WeChat account',
 

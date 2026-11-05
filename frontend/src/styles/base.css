@@ -1,0 +1,309 @@
+/* ============================================================
+   AI Todo · 基础样式（reset + 页面骨架）
+   颜色 / 圆角 / 阴影 / 字体全部引用 CSS 变量，
+   三套主题（product / pixel / hacker）只换变量与少量装饰。
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+h1, h2, h3, p { margin: 0; }
+button { font-family: inherit; }
+a { color: var(--accent); }
+
+#app { min-height: 100vh; }
+
+/* ---------------------------------------------------------- 布局 */
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex: 1;
+  width: min(860px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 18px 0 96px;
+}
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------------------------------------------------------- 顶栏 */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  background: var(--topbar-bg);
+  backdrop-filter: var(--backdrop);
+  -webkit-backdrop-filter: var(--backdrop);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+.logo {
+  display: inline-flex;
+  color: var(--accent);
+}
+.logo svg { width: 22px; height: 22px; }
+
+.brand {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.pending-pill {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.live-dot i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.live-dot[data-state='live'] i { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.live-dot[data-state='down'] i { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+
+/* 用户菜单 */
+
+.user-menu { position: relative; }
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.user-chip:hover { background: var(--accent-soft); }
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.user-name { font-size: 13px; font-weight: 600; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-caret { width: 14px; height: 14px; color: var(--muted); }
+
+.user-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 200px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--dropdown-bg);
+  backdrop-filter: var(--backdrop);
+  -webkit-backdrop-filter: var(--backdrop);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+}
+
+.user-dropdown-head { padding: 8px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.user-dropdown-name { font-weight: 700; font-size: 14px; }
+.user-dropdown-role { color: var(--muted); font-size: 12px; }
+
+.user-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.user-menu-item:hover { background: var(--accent-soft); }
+.user-menu-item.is-danger { color: var(--danger); }
+.user-menu-item.is-danger:hover { background: var(--danger-soft); }
+.user-menu-item svg { width: 16px; height: 16px; flex: none; }
+
+/* ---------------------------------------------------------- 横幅 */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(860px, calc(100% - 32px));
+  margin: 14px auto 0;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  color: var(--text);
+  font-size: 13px;
+}
+.banner svg { width: 18px; height: 18px; flex: none; color: var(--warn); }
+
+.banner-email { background: var(--accent-soft); border-color: var(--accent); }
+.banner-email svg { color: var(--accent); }
+
+/* ---------------------------------------------------------- 工具栏 */
+
+.toolbar {
+  width: min(860px, calc(100% - 32px));
+  margin: 16px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.tab {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.tab:hover { color: var(--text); }
+.tab.is-active { background: var(--accent); color: var(--accent-contrast); }
+
+.toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------- 空态 */
+
+.empty { text-align: center; padding: 72px 0 40px; color: var(--muted); }
+.empty-mark { color: var(--muted); opacity: 0.6; }
+.empty-mark svg { width: 56px; height: 56px; }
+.empty-title { margin-top: 14px; font-size: 16px; font-weight: 600; color: var(--text-2); }
+.empty-sub { margin-top: 4px; font-size: 13px; }
+
+/* ---------------------------------------------------------- 独立管理页 */
+
+.page { width: min(860px, calc(100% - 32px)); margin: 0 auto; padding: 18px 0 96px; }
+.page-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.page-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.page-body { display: flex; flex-direction: column; gap: 14px; }
+
+.mgmt-card {
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.mgmt-card-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+
+.mgmt-create-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.mgmt-create-row .input { flex: 1; min-width: 160px; }
+
+.mgmt-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 1fr 1.2fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 2px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.mgmt-row:first-of-type { border-top: none; }
+.mgmt-row-head { color: var(--muted); font-size: 12px; font-weight: 600; }
+.mgmt-row-head div { display: block !important; }
+
+.mgmt-name { display: block; font-weight: 600; }
+.mgmt-sub { display: block; color: var(--muted); font-size: 12px; }
+.mgmt-sub.badge-warn { color: var(--warn); }
+.mgmt-role-admin { color: var(--accent); font-weight: 600; }
+.mgmt-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------- 浮动按钮 */
+
+.fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.fab:hover { transform: scale(1.06); box-shadow: var(--shadow-lg); }
+.fab svg { width: 22px; height: 22px; }

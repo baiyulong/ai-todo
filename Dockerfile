@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ============================================================
-# 构建阶段：装全量依赖 → 编译 TypeScript
+# 构建阶段一：后端（装全量依赖 → 编译 TypeScript）
 # ============================================================
 FROM node:22-slim AS builder
 
@@ -13,6 +13,20 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+RUN npm run build
+
+# ============================================================
+# 构建阶段二：前端（Vue 3 + Vite）
+# ============================================================
+FROM node:22-slim AS web-builder
+
+WORKDIR /webapp
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend ./
+# API 地址走相对路径（/api 代理），构建期不需要后端地址
 RUN npm run build
 
 # ============================================================
@@ -35,7 +49,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
-COPY web ./web
+# 前端产物仍然落在 /app/web：运行时环境变量不用改
+COPY --from=web-builder /webapp/dist ./web
 
 # data 目录归属 node 用户。命名卷首次挂载时会继承镜像里该路径的内容与属主，
 # 因此容器以非 root 运行时依然能往 /app/data 里写凭据文件与数据库文件。

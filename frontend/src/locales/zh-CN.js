@@ -138,6 +138,13 @@ export const dict = {
   'section.mcp': 'MCP 接入',
   'section.shortcuts': '快捷键',
   'section.language': '语言',
+  'section.theme': '主题',
+  'theme.product': '产品 · Apple 风',
+  'theme.productDesc': '毛玻璃材质，iOS 系统色，干净克制的默认界面',
+  'theme.pixel': '像素风',
+  'theme.pixelDesc': '8-bit 复古游戏机，硬边框与像素字体',
+  'theme.hacker': '黑客风',
+  'theme.hackerDesc': '纯黑终端，荧光绿与 CRT 扫描线',
   'section.appearance': '通用',
   'section.wechat': '微信账号',
 

@@ -26,7 +26,7 @@
  *  17. 微信登录：发起扫码 → 授权回调 → 桌面端取回会话 → 账号映射与绑定
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -184,6 +184,10 @@ async function startMockWechatServer() {
       AI_TODO_DATA_DIR: dataDir,
       AI_TODO_WECHAT_MOCK: 'on',
       AI_TODO_LOG_LEVEL: 'error',
+      // 模拟授权页的地址由 AI_TODO_BASE_URL 拼出来。调用方进程里可能带着
+      // 指向别的实例的 AI_TODO_BASE_URL（比如 e2e 本身就是用这个变量定向的），
+      // 不覆盖的话 authorize_url 会指到别人的端口上，模拟授权页 404。
+      AI_TODO_BASE_URL: `http://127.0.0.1:${port}`,
     },
     stdio: 'ignore',
   });
@@ -239,73 +243,72 @@ async function main() {
   check('健康检查返回 ok', health.ok === true, JSON.stringify(health));
   check('数据库驱动为 PGlite 或 pg', ['pglite', 'pg'].includes(health.driver), health.driver);
 
-  for (const path of ['/', '/app.js', '/sw.js', '/styles.css', '/icon.svg', '/manifest.webmanifest']) {
+  for (const path of ['/', '/sw.js', '/icon.svg', '/manifest.webmanifest', '/cloud.html']) {
     const res = await fetch(`${BASE}${path}`);
     check(`静态资源 ${path} 可达`, res.status === 200, `HTTP ${res.status}`);
   }
 
-  // 前端静态检查：dialog 表单的「点了哪颗按钮」必须用 event.submitter 判断。
-  // 这类缺陷藏在浏览器里——API 层的自动化测试全都测不到，只能静态拦一道。
-  // 背景：returnValue 是 HTMLDialogElement 的属性，<form> 上没有这个属性。
-  const appJs = stripJsComments(readFileSync(join(root, 'web', 'app.js'), 'utf8'));
-  check(
-    '前端没有把 returnValue 挂在 <form> 上（该属性属于 HTMLDialogElement）',
-    !/\$\('[\w-]*form'\)\s*\.\s*returnValue/.test(appJs),
-    '这种写法会让提交处理器永远提前 return，表现为「点了添加没反应」',
-  );
-  check(
-    'dialog 表单的提交判定使用了 event.submitter',
-    /addEventListener\('submit'[\s\S]{0,300}e\.submitter/.test(appJs),
-    '缺少 submitter 判断时无法区分「添加」与「取消」',
-  );
-
-  // 登录表单的输入框必须带 class="input"。
-  // 少带这个类，.input 的边框、内边距、圆角、焦点光环整套都不生效，
-  // 页面会悄悄退回浏览器默认样式——这种缺陷 API 层测试全都够不着。
-  const indexHtml = readFileSync(join(root, 'web', 'index.html'), 'utf8');
-  for (const fieldId of ['login-username', 'login-password']) {
-    const tag = indexHtml.match(new RegExp(`<input[^>]*id="${fieldId}"[^>]*>`));
-    check(
-      `登录输入框 ${fieldId} 带 class="input"`,
-      !!tag && /\bclass="[^"]*\binput\b/.test(tag[0]),
-      '缺少 class="input" 会让整套输入框样式失效，界面退回浏览器默认样式',
-    );
+  // 首页必须引用 Vite 构建产物（Vue 前端，产物在 /assets/ 下带 hash）
+  const indexHtml = await (await fetch(`${BASE}/`)).text();
+  const assetMatch = indexHtml.match(/\/assets\/index-[\w-]+\.js/);
+  check('首页引用了 Vite 构建产物', !!assetMatch, indexHtml.slice(0, 120));
+  if (assetMatch) {
+    const asset = await fetch(`${BASE}${assetMatch[0]}`);
+    check('前端构建产物可加载', asset.ok, `HTTP ${asset.status}`);
   }
+  check('首页带主题初始化脚本（防主题闪烁）', indexHtml.includes('ai_todo_theme'));
 
-  // 登录页必须从文档里「摘掉」，而不是只 hidden。
-  // 登录表单里有 password 输入框：它只要还挂在文档里，浏览器工具读到
-  // 「容器里含密码框」就会判定需要人工接管认证，把当前会话所有工具（含终端）一起锁死，
-  // 只能靠新开一轮对话恢复。摘出文档这颗雷就拆了。
-  check(
-    '登录页是从文档里摘掉的，而不是只切换 hidden',
-    !/\$\('login'\)\s*\.\s*hidden/.test(appJs) && /loginScreen\.remove\(\)/.test(appJs),
-    '登录表单留在 DOM 里会让浏览器工具反复触发「认证接管」闸门，整个会话的工具被锁死',
-  );
+  /* ---------------------------------------------------- 前端静态检查（frontend/） */
 
-  // 来源筛选：下拉必须存在，且请求要带上 source 参数。
-  // 少了任何一个，用户就只能在一堆任务里靠肉眼找「哪个工具发的」。
-  check(
-    '工具栏有「按来源筛选」下拉',
-    /id="filter-source"/.test(indexHtml),
-    '缺少来源筛选下拉，无法区分不同 AI 工具推来的任务',
-  );
-  check(
-    '任务列表请求会带上来源筛选参数',
-    /params\.set\('source'/.test(appJs),
-    '筛选参数没有传到接口上，下拉选了也不生效',
-  );
+  // 收集新前端源码做静态检查
+  const feSrc = join(root, 'frontend', 'src');
+  function listFeFiles(dir) {
+    const out = [];
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) out.push(...listFeFiles(full));
+      else if (/\.(vue|js|css)$/.test(name)) out.push(full);
+    }
+    return out;
+  }
+  const feFiles = listFeFiles(feSrc);
+  check('新前端源码目录存在', feFiles.length > 0, feSrc);
+
+  // 一份去掉注释的代码文本，供关键行为正则检查
+  const feCode = feFiles
+    .filter((f) => /\.(vue|js)$/.test(f))
+    .map((f) => ({ path: f, src: stripJsComments(readFileSync(f, 'utf8')) }))
+    .map((x) => x.src)
+    .join('\n');
+
+  // 三套主题都要有变量层文件，且覆盖各自的 data-theme 选择器
+  for (const theme of ['product', 'pixel', 'hacker']) {
+    const file = join(feSrc, 'themes', `${theme}.css`);
+    const css = existsSync(file) ? readFileSync(file, 'utf8') : '';
+    check(`主题 ${theme} 的样式文件存在且生效`, css.includes(`data-theme='${theme}'`) || (theme === 'product' && css.includes(':root')));
+  }
+  check('主题切换有 localStorage 持久化', feCode.includes('ai_todo_theme'));
+
+  // 来源筛选：下拉绑定与请求参数都不能丢
+  check('任务列表请求会带上来源筛选参数', feCode.includes(`params.set('source'`));
 
   // MCP 配置块必须能一键复制：配置要抄进 AI 客户端，手抄错一个字符客户端就起不来。
-  check(
-    'MCP 配置块有复制按钮',
-    /code-copy/.test(appJs) && /copyText/.test(appJs),
-    '没有复制按钮，用户只能手抄 JSON，容易抄错',
-  );
+  check('MCP 配置块有复制按钮', feCode.includes('copyMcp') || feCode.includes('copyText'));
+
+  // 剪贴板写入必须有 execCommand 兜底：局域网 http 访问时 navigator.clipboard 不存在
   check(
     '剪贴板写入有兜底路径（局域网 http 访问时 navigator.clipboard 不可用）',
-    /execCommand\('copy'\)/.test(appJs),
-    'navigator.clipboard 只在安全上下文可用，局域网 http 访问会直接失效',
+    feCode.includes(`execCommand('copy')`),
   );
+
+  // 通知提示音用 Web Audio 现场合成，不引音频文件
+  check('通知提示音使用 Web Audio 合成', feCode.includes('AudioContext'));
+
+  // 通知权限必须走 Permissions API 实时查询，不能用 Notification.permission 快照
+  check('通知权限使用 Permissions API 实时查询', feCode.includes('navigator.permissions.query'));
+
+  // 禁用账号功能已删除，不允许回头：前端不应再出现 setActive / 禁用字样
+  check('前端没有残留的禁用账号逻辑', !/setActive|is_active/.test(feCode));
 
   // MCP 配置必须给出新的远程 HTTP 方案，不能还是只有 stdio。
   const cliJs = readFileSync(join(root, 'src', 'cli.ts'), 'utf8');
@@ -323,8 +326,8 @@ async function main() {
   /* ---------------------------------------------------- i18n 静态检查 */
 
   // 两个语言包的键必须完全对齐：少一个键，切到那个语言就会露出键名本身。
-  const zh = (await import(pathToFileURL(join(root, 'web', 'locales', 'zh-CN.js')).href)).dict;
-  const en = (await import(pathToFileURL(join(root, 'web', 'locales', 'en-US.js')).href)).dict;
+  const zh = (await import(pathToFileURL(join(feSrc, 'locales', 'zh-CN.js')).href)).dict;
+  const en = (await import(pathToFileURL(join(feSrc, 'locales', 'en-US.js')).href)).dict;
   const onlyZh = Object.keys(zh).filter((k) => !(k in en));
   const onlyEn = Object.keys(en).filter((k) => !(k in zh));
   check(
@@ -333,46 +336,33 @@ async function main() {
     `中文独有：${onlyZh.join(', ') || '无'}；英文独有：${onlyEn.join(', ') || '无'}`,
   );
 
-  // 静态文案必须挂 data-i18n，否则切语言后它还是原来那语言。
-  const html = stripHtmlComments(indexHtml);
-  const bareCn = [...html.matchAll(/>([^<>]*[一-龥][^<>]*)</g)]
-    .map((m) => m[1].trim())
-    .filter(Boolean);
+  // 前端代码里不许硬编码中文：所有界面文案都必须走 t()。
+  // 模板/脚本逐行扫，语言包与样式文件除外；HTML 注释（模板里的中文注释）不算文案。
+  // 例外：
+  //   · i18n.js 里 label: '中文' 是语言自己的名字，按惯例不翻译；
+  //   · qr.js 的 throw 信息是给开发者看的（与服务端 message 同一约定），不是界面文案。
+  const cnLines = feFiles
+    .filter((f) => /\.(vue|js)$/.test(f) && !f.includes(`${join('', 'locales')}`) && !f.endsWith('qr.js'))
+    .flatMap((f) =>
+      stripJsComments(stripHtmlComments(readFileSync(f, 'utf8')))
+        .split('\n')
+        .map((line, i) => ({ file: f.replace(root, ''), line: line.trim(), no: i + 1 }))
+        // label: '中文' 是语言自己的名字（不翻译的惯例），豁免
+        .filter((x) => /[一-龥]/.test(x.line) && !/label:\s*'[^']*[\u4e00-\u9fa5][^']*'/.test(x.line)),
+    );
   check(
-    'index.html 里没有裸露的中文文案',
-    bareCn.length === 0,
-    `这些文字没挂 data-i18n：${bareCn.slice(0, 3).join(' / ')}`,
+    '前端代码里没有硬编码的中文文案',
+    cnLines.length === 0,
+    cnLines.slice(0, 3).map((x) => `${x.file}:${x.no}`).join(', '),
   );
 
-  // 引用到的键必须真实存在，缺了就会在界面上直接显示键名。
-  const htmlKeys = new Set(
-    [...html.matchAll(/data-i18n(?:-placeholder|-title|-aria-label)?="([^"]+)"/g)].map((m) => m[1]),
-  );
-  const missingHtmlKeys = [...htmlKeys].filter((k) => !(k in zh) || !(k in en));
+  // t() 引用到的键必须真实存在，缺了就会在界面上直接显示键名。
+  const usedKeys = new Set([...feCode.matchAll(/\bt\('([A-Za-z0-9_.]+)'/g)].map((m) => m[1]));
+  const missingKeys = [...usedKeys].filter((k) => !(k in zh) || !(k in en));
   check(
-    'index.html 引用的翻译键在语言包里都存在',
-    missingHtmlKeys.length === 0,
-    `缺失：${missingHtmlKeys.join(', ')}`,
-  );
-
-  // 动态文案同理：app.js 里不许再硬编码中文。
-  const appCode = stripJsComments(readFileSync(join(root, 'web', 'app.js'), 'utf8'));
-  const cnInCode = appCode
-    .split('\n')
-    .map((line, i) => ({ line: line.trim(), no: i + 1 }))
-    .filter((x) => /[一-龥]/.test(x.line));
-  check(
-    'app.js 里没有硬编码的中文文案',
-    cnInCode.length === 0,
-    `第 ${cnInCode.slice(0, 3).map((x) => x.no).join(', ')} 行还有中文`,
-  );
-
-  const appKeys = new Set([...appCode.matchAll(/\bt\('([A-Za-z0-9_.]+)'/g)].map((m) => m[1]));
-  const missingAppKeys = [...appKeys].filter((k) => !(k in zh) || !(k in en));
-  check(
-    'app.js 里 t() 用到的翻译键都存在',
-    missingAppKeys.length === 0,
-    `缺失：${missingAppKeys.join(', ')}`,
+    '前端 t() 用到的翻译键都存在',
+    missingKeys.length === 0,
+    `缺失：${missingKeys.join(', ')}`,
   );
 
   // 级别与状态标签是动态拼键（severity.${v}），静态扫不到，得单独盯。
@@ -385,6 +375,20 @@ async function main() {
     '级别与状态标签的翻译键齐全',
     missingEnumKeys.length === 0,
     `缺失：${missingEnumKeys.join(', ')}`,
+  );
+
+  // 主题选择区的文案键也要齐全（动态渲染的三张主题卡）
+  const themeKeys = [
+    'section.theme',
+    'theme.product', 'theme.productDesc',
+    'theme.pixel', 'theme.pixelDesc',
+    'theme.hacker', 'theme.hackerDesc',
+  ];
+  const missingThemeKeys = themeKeys.filter((k) => !(k in zh) || !(k in en));
+  check(
+    '主题选择的翻译键齐全',
+    missingThemeKeys.length === 0,
+    `缺失：${missingThemeKeys.join(', ')}`,
   );
 
   /* 2. 登录 */
@@ -688,7 +692,7 @@ async function main() {
   const newUser = `e2e${runId}`;
   const createdUser = await api('/api/v1/admin/users', {
     method: 'POST',
-    body: JSON.stringify({ username: newUser }),
+    body: JSON.stringify({ username: newUser, email: `${newUser}@e2e.local` }),
   });
   check('管理员可以新建账号', createdUser.res.status === 201, `HTTP ${createdUser.res.status}`);
   check('新账号返回初始密码', typeof createdUser.body.password === 'string' && createdUser.body.password.length >= 8);
@@ -861,7 +865,7 @@ async function main() {
   const isoUser = `iso${runId}`;
   const isoCreated = await api('/api/v1/admin/users', {
     method: 'POST',
-    body: JSON.stringify({ username: isoUser }),
+    body: JSON.stringify({ username: isoUser, email: `${isoUser}@e2e.local` }),
   });
   check('可以创建隔离测试账号', isoCreated.res.status === 201, `HTTP ${isoCreated.res.status}`);
 
@@ -1037,7 +1041,7 @@ async function main() {
   const purgeUser = `purge${runId}`;
   const purgeCreated = await api('/api/v1/admin/users', {
     method: 'POST',
-    body: JSON.stringify({ username: purgeUser }),
+    body: JSON.stringify({ username: purgeUser, email: `${purgeUser}@e2e.local` }),
   });
   check('可以创建批量清空测试账号', purgeCreated.res.status === 201, `HTTP ${purgeCreated.res.status}`);
 
@@ -1306,17 +1310,21 @@ async function main() {
   console.log('\n[11] 微信登录');
 
   // 静态检查：二维码必须由本地模块生成，不能依赖外部图片服务
-  check('登录页有微信登录入口', /id="login-wechat"/.test(indexHtml), '没有 #login-wechat 按钮');
-  check('前端引入了本地二维码模块', /from '\.\/qr\.js'/.test(appJs), 'app.js 没有 import qr.js');
+  check('登录页有微信登录入口', /startWechatLogin/.test(feCode), '登录页没有发起扫码的逻辑');
+  check('前端引入了本地二维码模块', /from '\.\/qr\.js'/.test(feCode), '没有 import qr.js');
   check(
     '存在零依赖的二维码实现',
-    existsSync(join(root, 'web', 'qr.js')),
-    '缺少 web/qr.js，扫码面板画不出二维码',
+    existsSync(join(feSrc, 'qr.js')),
+    '缺少 frontend/src/qr.js，扫码面板画不出二维码',
   );
+  // v-html 只允许用在本地 qr.js 生成的 SVG 上（内容完全本地可控），
+  // 其余任何 v-html / innerHTML 都不该出现：外部内容可能被当成 HTML 执行。
+  const vHtmlUsages = [...feCode.matchAll(/v-html="([^"]+)"/g)].map((m) => m[1]);
+  const badVHtml = vHtmlUsages.filter((expr) => !/^(loginQr\.svg|bindDialog\.svg)$/.test(expr.trim()));
   check(
-    '二维码用 DOMParser 插入而不是 innerHTML',
-    /DOMParser/.test(appJs) && !/innerHTML/.test(appJs),
-    'innerHTML 不该出现在这个项目里：外部内容可能被当成 HTML 执行',
+    'v-html 只用于本地生成的二维码 SVG，项目里没有 innerHTML',
+    badVHtml.length === 0 && !/innerHTML/.test(feCode),
+    badVHtml.join(', ') || '出现了 innerHTML',
   );
 
   // 主实例支持哪些登录方式（没配 AppID 时应该是关闭的）

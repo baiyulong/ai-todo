@@ -1,0 +1,132 @@
+/* ============================================================
+   主题 · hacker · 纯黑终端
+   ------------------------------------------------------------
+   等宽字体、纯黑底荧光绿、辉光边框、CRT 扫描线、终端风按钮。
+   ============================================================ */
+
+[data-theme='hacker'] {
+  color-scheme: dark;
+
+  --bg: #000000;
+  --surface: #050805;
+  --surface-2: #0a120a;
+  --topbar-bg: rgba(0, 0, 0, 0.85);
+  --drawer-bg: rgba(2, 6, 2, 0.94);
+  --dropdown-bg: rgba(5, 12, 5, 0.95);
+  --border: #123315;
+  --border-strong: #1f5c22;
+
+  --text: #33ff66;
+  --text-2: #2bd45a;
+  --muted: #1a7a30;
+
+  --accent: #33ff66;
+  --accent-hover: #66ff99;
+  --accent-contrast: #001a06;
+  --accent-soft: rgba(51, 255, 102, 0.1);
+
+  --danger: #ff4d4d;
+  --danger-soft: rgba(255, 77, 77, 0.12);
+  --warn: #ffd24d;
+  --warn-soft: rgba(255, 210, 77, 0.12);
+  --ok: #33ff66;
+  --ok-soft: rgba(51, 255, 102, 0.12);
+  --info: #6affb0;
+  --info-soft: rgba(106, 255, 176, 0.1);
+
+  --toast-bg: #001a06;
+  --toast-fg: #33ff66;
+  --code-bg: #010d03;
+  --code-fg: #33ff66;
+
+  --shadow-sm: none;
+  --shadow-md: 0 0 12px rgba(51, 255, 102, 0.12);
+  --shadow-lg: 0 0 24px rgba(51, 255, 102, 0.18);
+
+  --radius: 2px;
+  --radius-lg: 2px;
+
+  --backdrop: none;
+
+  --sans: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Courier New', monospace;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --pixel-font: var(--mono);
+}
+
+/* CRT 扫描线：细横纹铺满全屏，透明度低到不影响可读性 */
+[data-theme='hacker'] body {
+  position: relative;
+  text-shadow: 0 0 6px rgba(51, 255, 102, 0.35);
+}
+[data-theme='hacker'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(51, 255, 102, 0.03) 0px,
+    rgba(51, 255, 102, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* 终端风：方括号装饰、辉光 */
+[data-theme='hacker'] .brand::before { content: '['; color: var(--muted); margin-right: 4px; }
+[data-theme='hacker'] .brand::after { content: ']'; color: var(--muted); margin-left: 4px; }
+[data-theme='hacker'] .logo { filter: drop-shadow(0 0 4px rgba(51, 255, 102, 0.6)); }
+
+[data-theme='hacker'] .btn {
+  border-color: var(--border-strong);
+  background: transparent;
+  box-shadow: inset 0 0 8px rgba(51, 255, 102, 0.05);
+}
+[data-theme='hacker'] .btn:hover {
+  background: rgba(51, 255, 102, 0.08);
+  box-shadow: 0 0 10px rgba(51, 255, 102, 0.25);
+}
+[data-theme='hacker'] .btn-primary {
+  background: rgba(51, 255, 102, 0.12);
+  border-color: var(--accent);
+}
+[data-theme='hacker'] .btn-danger { border-color: var(--danger); }
+[data-theme='hacker'] .btn-danger-solid { background: var(--danger); border-color: var(--danger); }
+[data-theme='hacker'] .btn-wechat { background: transparent; border-color: #07c160; color: #07c160; }
+
+[data-theme='hacker'] .tab.is-active {
+  background: rgba(51, 255, 102, 0.14);
+  color: var(--accent);
+  box-shadow: inset 0 0 8px rgba(51, 255, 102, 0.2);
+}
+
+[data-theme='hacker'] .task { box-shadow: none; }
+[data-theme='hacker'] .task:hover { box-shadow: 0 0 10px rgba(51, 255, 102, 0.15); }
+[data-theme='hacker'] .task.is-selected { box-shadow: 0 0 14px rgba(51, 255, 102, 0.25); }
+
+[data-theme='hacker'] .code-block,
+[data-theme='hacker'] .qr-token-row code {
+  text-shadow: 0 0 5px rgba(51, 255, 102, 0.5);
+}
+
+[data-theme='hacker'] .fab {
+  background: transparent;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(51, 255, 102, 0.3);
+}
+[data-theme='hacker'] .fab:hover { box-shadow: 0 0 20px rgba(51, 255, 102, 0.5); }
+
+[data-theme='hacker'] .avatar { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+[data-theme='hacker'] .pending-pill { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+[data-theme='hacker'] .login-mark { background: transparent; border: 1.5px solid var(--accent); color: var(--accent); }
+[data-theme='hacker'] .drawer-head { border-bottom-style: dashed; }
+[data-theme='hacker'] .mgmt-row,
+[data-theme='hacker'] .token-row { border-top-style: dashed; }
+[data-theme='hacker'] .user-dropdown-head { border-bottom-style: dashed; }
+[data-theme='hacker'] .theme-option.is-active { border-style: dashed; }
+[data-theme='hacker'] .drawer-section > h3 { letter-spacing: 0.12em; }
+[data-theme='hacker'] .hint,
+[data-theme='hacker'] .status-row .k { color: var(--muted); }
