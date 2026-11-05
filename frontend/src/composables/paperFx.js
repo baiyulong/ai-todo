@@ -20,14 +20,19 @@ function later(fn, ms) {
   timers.push(setTimeout(fn, ms));
 }
 
-/* 风线：一道弧形细线从左扫到右，淡入淡出 */
+/* 风线：一道大弧贴着屏幕底部扫过，末端带一个打转的「卷」 */
 function spawnWindLine() {
   if (!layer) return;
   const w = document.createElement('span');
   w.className = 'paper-wind';
-  w.style.top = `${15 + Math.random() * 55}vh`;
-  w.style.width = `${120 + Math.random() * 140}px`;
-  w.style.animationDuration = `${2.4 + Math.random() * 1.8}s`;
+  w.style.bottom = `${6 + Math.random() * 20}vh`;
+  w.style.width = `${280 + Math.random() * 260}px`;
+  w.style.animationDuration = `${2.2 + Math.random() * 1.6}s`;
+  const curl = document.createElement('i');
+  const size = 26 + Math.random() * 16;
+  curl.style.width = `${size}px`;
+  curl.style.height = `${size}px`;
+  w.appendChild(curl);
   w.addEventListener('animationend', () => w.remove());
   layer.appendChild(w);
 }
@@ -37,7 +42,7 @@ function spawnLeaf() {
   if (!layer) return;
   const leaf = document.createElement('span');
   leaf.className = 'paper-leaf';
-  leaf.style.top = `${5 + Math.random() * 60}vh`;
+  leaf.style.bottom = `${4 + Math.random() * 28}vh`;
   leaf.style.animationDuration = `${4 + Math.random() * 3.5}s`;
   leaf.style.animationDelay = `${Math.random() * 0.8}s`;
   const inner = document.createElement('i');
