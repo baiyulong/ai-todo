@@ -187,6 +187,7 @@ export const dict = {
   'email.needEmail': '请输入邮箱地址',
   'email.needCode': '请输入验证码',
   'email.boundToast': '邮箱绑定成功',
+  'email.change': '修改邮箱',
   'email.bannerText': '账号尚未绑定邮箱，任务与转交的邮件通知发不出去。',
   'email.bannerBtn': '去绑定',
 

@@ -1505,17 +1505,10 @@ function renderDrawer() {
   }
 
   // 邮箱：任务通知与转交通知都发到这里。账号必须绑定，没绑就给绑定表单。
+  // 换绑走同一个验证码流程（后端 /me/email/start|confirm 不区分首次绑定与修改），
+  // 所以这里把「新邮箱 + 验证码」表单抽成函数，绑定和修改两处复用。
   if (state.me) {
-    const s2e = section(t('email.section'));
-    if (state.me.email) {
-      s2e.appendChild(statusRow(t('email.current'), state.me.email, 'ok'));
-      const hint = document.createElement('p');
-      hint.className = 'hint';
-      hint.textContent = t('email.boundHint');
-      s2e.appendChild(hint);
-    } else {
-      s2e.appendChild(hint(t('email.needBind')));
-
+    const buildEmailForm = (container) => {
       const emailInput = document.createElement('input');
       emailInput.className = 'input';
       emailInput.type = 'email';
@@ -1570,9 +1563,36 @@ function renderDrawer() {
         }
       });
 
-      s2e.appendChild(emailInput);
-      s2e.appendChild(codeRow);
-      s2e.appendChild(bindBtn);
+      container.appendChild(emailInput);
+      container.appendChild(codeRow);
+      container.appendChild(bindBtn);
+    };
+
+    const s2e = section(t('email.section'));
+    if (state.me.email) {
+      s2e.appendChild(statusRow(t('email.current'), state.me.email, 'ok'));
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = t('email.boundHint');
+      s2e.appendChild(hint);
+
+      // 修改绑定邮箱：点按钮展开换绑表单，仍是「新邮箱 + 验证码」两步
+      const changeBtn = document.createElement('button');
+      changeBtn.type = 'button';
+      changeBtn.className = 'btn btn-quiet';
+      changeBtn.textContent = t('email.change');
+      const formWrap = document.createElement('div');
+      formWrap.hidden = true;
+      formWrap.style.marginTop = '8px';
+      buildEmailForm(formWrap);
+      changeBtn.addEventListener('click', () => {
+        formWrap.hidden = !formWrap.hidden;
+      });
+      s2e.appendChild(changeBtn);
+      s2e.appendChild(formWrap);
+    } else {
+      s2e.appendChild(hint(t('email.needBind')));
+      buildEmailForm(s2e);
     }
     body.appendChild(s2e);
   }

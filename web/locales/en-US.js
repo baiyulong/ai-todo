@@ -187,6 +187,7 @@ export const dict = {
   'email.needEmail': 'Please enter an email address',
   'email.needCode': 'Please enter the code',
   'email.boundToast': 'Email bound',
+  'email.change': 'Change email',
   'email.bannerText': 'No email bound — task and hand-off email notifications cannot reach you.',
   'email.bannerBtn': 'Bind now',
 
