@@ -245,3 +245,88 @@
 [data-theme='pixel'] .select:focus {
   outline-offset: 0;
 }
+
+/* ------------------------------------------------------------
+   秋风卷落叶：每隔一阵，风从左吹过——
+   弧形风线掠过中段、秋叶翻滚飘过、左下角纸角被掀起卷动再落回
+   （JS 在 paperFx.js 生成）纯装饰，不挡任何交互
+   ------------------------------------------------------------ */
+[data-theme='pixel'] .paper-fx-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* 风线：一道弧形细线（上边框 + 大圆角成弧），淡入淡出扫过 */
+[data-theme='pixel'] .paper-wind {
+  position: absolute;
+  left: -280px;
+  height: 12px;
+  border-top: 2px solid rgba(75, 96, 124, 0.5);
+  border-radius: 50%;
+  opacity: 0;
+  animation-name: paper-wind-pass;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes paper-wind-pass {
+  0% { transform: translateX(0) translateY(0); opacity: 0; }
+  18% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { transform: translateX(132vw) translateY(-16px); opacity: 0; }
+}
+
+/* 落叶：方形切两刀就是叶子（0 70% 0 70% 圆角），外层行程、内层翻滚 */
+[data-theme='pixel'] .paper-leaf {
+  position: absolute;
+  left: -40px;
+  opacity: 0;
+  animation-name: paper-leaf-travel;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+[data-theme='pixel'] .paper-leaf i {
+  display: block;
+  border-radius: 0 70% 0 70%;
+  box-shadow: 0 1px 2px rgba(37, 47, 61, 0.25);
+  animation-name: paper-leaf-tumble;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes paper-leaf-travel {
+  0% { transform: translateX(0) translateY(0); opacity: 0; }
+  10% { opacity: 0.9; }
+  50% { transform: translateX(55vw) translateY(-22px); }
+  85% { opacity: 0.9; }
+  100% { transform: translateX(112vw) translateY(12px); opacity: 0; }
+}
+@keyframes paper-leaf-tumble {
+  0% { transform: rotate(0deg) translateX(0); }
+  25% { transform: rotate(160deg) translateX(6px); }
+  50% { transform: rotate(320deg) translateX(-5px); }
+  75% { transform: rotate(500deg) translateX(5px); }
+  100% { transform: rotate(680deg) translateX(0); }
+}
+
+/* 纸角：左下角掀起、抖两下、落回（锚点在左下角点） */
+[data-theme='pixel'] .paper-corner {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 96px;
+  height: 96px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 78%);
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+  transform-origin: 0 100%;
+  filter: drop-shadow(0 -2px 5px rgba(37, 47, 61, 0.22));
+  animation: paper-corner-lift 2.8s cubic-bezier(0.35, 0, 0.25, 1) forwards;
+}
+@keyframes paper-corner-lift {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(-16deg) translate(6px, -4px); }
+  55% { transform: rotate(-10deg) translate(4px, -2px); }
+  78% { transform: rotate(-14deg) translate(5px, -3px); }
+  100% { transform: rotate(0deg) translate(0, 0); }
+}

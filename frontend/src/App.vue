@@ -14,6 +14,7 @@ import {
   showDesktopNotification,
 } from './composables/notify.js';
 import { startHackerFx, stopHackerFx } from './composables/hackerFx.js';
+import { startPaperFx, stopPaperFx } from './composables/paperFx.js';
 
 import LoginView from './components/views/LoginView.vue';
 import TopBar from './components/layout/TopBar.vue';
@@ -114,12 +115,14 @@ function onKeydown(e) {
   }
 }
 
-/* 黑客风动态效果只在该主题下运行，切走即停 */
+/* 主题专属动态效果只在该主题下运行，切走即停 */
 watch(
   () => ui.theme,
   (th) => {
     if (th === 'hacker') startHackerFx();
     else stopHackerFx();
+    if (th === 'pixel') startPaperFx();
+    else stopPaperFx();
   },
   { immediate: true },
 );
@@ -136,6 +139,7 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown);
   stopHackerFx();
+  stopPaperFx();
   if (es) es.close();
 });
 </script>
