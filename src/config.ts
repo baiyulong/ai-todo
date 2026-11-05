@@ -124,13 +124,13 @@ export function loadConfig(): Config {
   // 邮件：配了 SMTP_HOST 即启用；没配则降级为日志模式（本地开发不用配）
   const mailHost = process.env.AI_TODO_SMTP_HOST?.trim() || '';
   const mailPort = Number(process.env.AI_TODO_SMTP_PORT ?? 465);
+  // 显式 on/off 优先；空 / 未设时按端口推断（465 隐式 TLS，其余明文 + STARTTLS）
+  const mailSecure = process.env.AI_TODO_SMTP_SECURE?.trim() || '';
   const mail: MailConfig = {
     enabled: mailHost !== '',
     host: mailHost,
     port: mailPort,
-    secure: (process.env.AI_TODO_SMTP_SECURE ?? (mailPort === 465 ? 'on' : 'off'))
-      .trim()
-      .toLowerCase() === 'on',
+    secure: (mailSecure || (mailPort === 465 ? 'on' : 'off')).toLowerCase() === 'on',
     user: process.env.AI_TODO_SMTP_USER?.trim() || '',
     pass: process.env.AI_TODO_SMTP_PASS ?? '',
     from: process.env.AI_TODO_SMTP_FROM?.trim() || `AI Todo <${process.env.AI_TODO_SMTP_USER?.trim() || 'no-reply@localhost'}>`,

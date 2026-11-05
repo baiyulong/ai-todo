@@ -36,6 +36,13 @@ services:
       AI_TODO_SESSION_TTL_DAYS: "${AI_TODO_SESSION_TTL_DAYS:-30}"
       # 远程 MCP 端点（POST /mcp）：客户端填 URL + Bearer 令牌即可远程接入
       AI_TODO_MCP_HTTP: "${AI_TODO_MCP_HTTP:-on}"
+      # 邮件通知：配了 AI_TODO_SMTP_HOST 即启用；留空 = 日志模式（邮件内容打到容器日志）
+      AI_TODO_SMTP_HOST: "${AI_TODO_SMTP_HOST:-}"
+      AI_TODO_SMTP_PORT: "${AI_TODO_SMTP_PORT:-465}"
+      AI_TODO_SMTP_USER: "${AI_TODO_SMTP_USER:-}"
+      AI_TODO_SMTP_PASS: "${AI_TODO_SMTP_PASS:-}"
+      AI_TODO_SMTP_FROM: "${AI_TODO_SMTP_FROM:-}"
+      AI_TODO_SMTP_SECURE: "${AI_TODO_SMTP_SECURE:-}"
       # 留空 = 用内置 PGlite，数据库文件在 /app/data/pgdata
       DATABASE_URL: ""
       TZ: "${TZ:-Asia/Shanghai}"
