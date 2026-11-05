@@ -91,6 +91,13 @@
 [data-theme='hacker'] .btn-primary {
   background: rgba(51, 255, 102, 0.12);
   border-color: var(--accent);
+  color: var(--accent);
+  text-shadow: 0 0 6px rgba(51, 255, 102, 0.5);
+}
+[data-theme='hacker'] .btn-primary:hover {
+  background: rgba(51, 255, 102, 0.22);
+  border-color: var(--accent-hover);
+  color: var(--accent-hover);
 }
 [data-theme='hacker'] .btn-danger { border-color: var(--danger); }
 [data-theme='hacker'] .btn-danger-solid { background: var(--danger); border-color: var(--danger); }
