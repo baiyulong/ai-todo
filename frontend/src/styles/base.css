@@ -38,7 +38,7 @@ a { color: var(--accent); }
 
 .main {
   flex: 1;
-  width: min(860px, calc(100% - 32px));
+  width: calc(100% - 32px);
   margin: 0 auto;
   padding: 18px 0 96px;
 }
@@ -187,7 +187,7 @@ a { color: var(--accent); }
   display: flex;
   align-items: center;
   gap: 10px;
-  width: min(860px, calc(100% - 32px));
+  width: calc(100% - 32px);
   margin: 14px auto 0;
   padding: 10px 14px;
   border-radius: var(--radius);
@@ -204,7 +204,7 @@ a { color: var(--accent); }
 /* ---------------------------------------------------------- 工具栏 */
 
 .toolbar {
-  width: min(860px, calc(100% - 32px));
+  width: calc(100% - 32px);
   margin: 16px auto 0;
   display: flex;
   align-items: center;
@@ -236,7 +236,10 @@ a { color: var(--accent); }
 .tab:hover { color: var(--text); }
 .tab.is-active { background: var(--accent); color: var(--accent-contrast); }
 
-.toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 筛选条件必须同行：.input/.select 默认 width:100% 会把 flex 项撑爆换行 */
+.toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.toolbar-right .select { width: auto; flex: none; }
+#filter-q { width: 200px; flex: 0 1 200px; min-width: 120px; }
 
 /* ---------------------------------------------------------- 空态 */
 
@@ -248,7 +251,7 @@ a { color: var(--accent); }
 
 /* ---------------------------------------------------------- 独立管理页 */
 
-.page { width: min(860px, calc(100% - 32px)); margin: 0 auto; padding: 18px 0 96px; }
+.page { width: calc(100% - 32px); margin: 0 auto; padding: 18px 0 96px; }
 .page-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
 .page-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 .page-body { display: flex; flex-direction: column; gap: 14px; }
