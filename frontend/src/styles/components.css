@@ -23,6 +23,9 @@
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* 按钮内图标：不定尺寸会被浏览器按默认替换元素大小（300×150）撑爆按钮 */
+.btn svg { width: 14px; height: 14px; flex: none; }
+
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
