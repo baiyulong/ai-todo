@@ -562,7 +562,19 @@ button.src-chip:hover { border-color: var(--accent); color: var(--accent); }
 .token-row:first-of-type { border-top: none; }
 .token-info { min-width: 0; }
 .token-name { font-size: 13px; font-weight: 600; }
+.token-value {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
 .token-meta { font-size: 12px; color: var(--muted); }
+.token-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 
 /* ---------------------------------------------------------- 对话框 */
 

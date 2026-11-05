@@ -592,8 +592,8 @@ async function completeWechatAuth(
 async function issuePat(db: Db, userId: string, name: string): Promise<string> {
   const token = generateToken('ait');
   await db.query(
-    `insert into api_tokens (user_id, name, token_hash, scopes) values ($1,$2,$3,$4)`,
-    [userId, name, hashToken(token), ['tasks:read', 'tasks:write']],
+    `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
+    [userId, name, token, hashToken(token), ['tasks:read', 'tasks:write']],
   );
   return token;
 }

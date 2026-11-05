@@ -38,7 +38,7 @@ interface SessionRow {
 /**
  * 解析一枚访问令牌（PAT）。
  *
- * PAT 与会话 token 均只存哈希，明文只在签发时出现一次。
+ * 校验按 token_hash 进行；明文另存一列，供管理界面随时复制。
  * 单独抽成函数，是为了让 MCP HTTP 端点复用同一套校验——
  * 它只认 Bearer PAT，不认会话 Cookie（理由见 server.ts 里的说明）。
  */
@@ -60,7 +60,7 @@ export async function resolvePatToken(db: Db, token: string): Promise<AuthContex
  * - Web 端用会话 Cookie（HttpOnly）
  * - MCP / 脚本用 Authorization: Bearer <PAT>
  *
- * PAT 与会话 token 均只存哈希，明文只在签发时出现一次。
+ * PAT 校验只依赖 token_hash（会话 token 同理）；PAT 明文另存一列，供管理界面随时复制。
  * 两种方式都绑定到具体 user_id——所有任务查询再按 user_id 过滤，
  * 因此用户之间天然互相看不到对方的数据。
  */

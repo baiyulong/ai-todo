@@ -150,6 +150,10 @@ create table if not exists api_tokens (
   revoked_at   timestamptz
 );
 
+-- 管理界面要支持随时复制令牌明文，所以明文直接落库（自托管场景可接受）。
+-- 老令牌只有哈希、无法回填明文，这些行的 token 为空，界面上仅显示掩码。
+alter table api_tokens add column if not exists token text;
+
 -- ============ Web 会话（浏览器登录后签发） ============
 create table if not exists sessions (
   id           uuid primary key default gen_random_uuid(),

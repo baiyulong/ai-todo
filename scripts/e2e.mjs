@@ -17,7 +17,7 @@
  *   8. 状态流转 ack / done / archive / snooze
  *   9. 规则读写、通知记录
  *  10. 用户隔离：新用户看不到别人的任务；自己的 PAT 只往自己名下推
- *  11. 令牌自助签发 / 吊销；禁用账号后令牌立即失效
+ *  11. 令牌自助签发 / 删除；删除后令牌立即失效
  *  12. MCP stdio：initialize / tools/list / tools/call / resources/read
  *  13. MCP 缺少 AI_TODO_TOKEN 时必须拒绝启动（凭证强制走环境变量）
  *  14. 通知聚合的账号隔离（不串用户）；账号在窗口期内被删除后服务不崩
@@ -749,8 +749,8 @@ async function main() {
   const userAfterPush = await userApi('/api/v1/tasks?status=pending&limit=50', { cookie: userCookie });
   check('任务只出现在推送者名下', userAfterPush.body.tasks.some((t) => t.id === pushed.body.task.id));
 
-  /* 11. 令牌自助签发 / 吊销 / 禁用账号 */
-  console.log('\n[11] 令牌自助签发与吊销');
+  /* 11. 令牌自助签发 / 删除 */
+  console.log('\n[11] 令牌自助签发与删除');
   const selfIssued = await userApi('/api/v1/tokens', {
     method: 'POST',
     body: JSON.stringify({ name: 'self-issued' }),
@@ -758,13 +758,25 @@ async function main() {
   check('用户可以自助签发令牌', selfIssued.res.status === 200 && !!selfIssued.body.token, `HTTP ${selfIssued.res.status}`);
 
   const tokenList = await userApi('/api/v1/tokens', { cookie: userCookie });
-  check('令牌列表只返回掩码', tokenList.body.tokens.every((t) => !t.token && t.prefix), JSON.stringify(tokenList.body.tokens[0]));
+  check(
+    '令牌列表返回明文（可随时复制）',
+    tokenList.body.tokens.length > 0 &&
+      tokenList.body.tokens.every((t) => t.token === selfIssued.body.token || typeof t.token === 'string'),
+    JSON.stringify(tokenList.body.tokens[0]),
+  );
 
-  const revoked = await userApi(`/api/v1/tokens/${tokenList.body.tokens[0].id}`, { method: 'DELETE' });
-  check('可以吊销自己的令牌', revoked.res.status === 200, `HTTP ${revoked.res.status}`);
+  const delRes = await userApi(`/api/v1/tokens/${tokenList.body.tokens[0].id}`, { method: 'DELETE' });
+  check('可以删除自己的令牌', delRes.res.status === 200, `HTTP ${delRes.res.status}`);
 
-  const afterRevoke = await userApi('/api/v1/tasks', { token: selfIssued.body.token });
-  check('吊销后令牌立即失效', afterRevoke.res.status === 401, `HTTP ${afterRevoke.res.status}`);
+  const afterDelete = await userApi('/api/v1/tasks', { token: selfIssued.body.token });
+  check('删除后令牌立即失效', afterDelete.res.status === 401, `HTTP ${afterDelete.res.status}`);
+
+  const afterDeleteList = await userApi('/api/v1/tokens', { cookie: userCookie });
+  check(
+    '删除后令牌从列表移除',
+    afterDeleteList.body.tokens.every((t) => t.id !== tokenList.body.tokens[0].id),
+    JSON.stringify(afterDeleteList.body.tokens.map((t) => t.id)),
+  );
 
   /* 12. MCP stdio */
   console.log('\n[12] MCP stdio 协议');

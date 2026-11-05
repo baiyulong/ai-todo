@@ -443,18 +443,19 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
   // ---------------------------------------------------------------- 访问令牌
 
-  // 列出令牌（只看得到掩码，明文只在签发时给一次）
+  // 列出令牌（明文一并返回，方便随时复制；老令牌只有掩码）
   app.get('/api/v1/tokens', { preHandler: authHooks }, async (req) => {
     const ctx = currentAuth(req);
     const res = await db.query<{
       id: string;
       name: string;
+      token: string | null;
       prefix: string;
       created_at: string;
       last_used_at: string | null;
       revoked_at: string | null;
     }>(
-      `select id, name, left(token_hash, 8) as prefix, created_at, last_used_at, revoked_at
+      `select id, name, token, left(token_hash, 8) as prefix, created_at, last_used_at, revoked_at
        from api_tokens where user_id = $1 order by created_at desc`,
       [ctx.userId],
     );
@@ -491,18 +492,18 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
     const token = generateToken('ait');
     await db.query(
-      `insert into api_tokens (user_id, name, token_hash, scopes) values ($1,$2,$3,$4)`,
-      [targetUserId, name, hashToken(token), ['tasks:read', 'tasks:write']],
+      `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
+      [targetUserId, name, token, hashToken(token), ['tasks:read', 'tasks:write']],
     );
     return { token, name, user_id: targetUserId, created_at: new Date().toISOString() };
   });
 
-  // 吊销令牌（只能吊销自己的）
+  // 删除令牌（只能删自己的；删掉后立即失效）
   app.delete<{ Params: { id: string } }>('/api/v1/tokens/:id', { preHandler: authHooks }, async (req, reply) => {
     const ctx = currentAuth(req);
     const res = await db.query(
-      `update api_tokens set revoked_at = now()
-       where id = $1 and user_id = $2 and revoked_at is null
+      `delete from api_tokens
+       where id = $1 and user_id = $2
        returning id`,
       [req.params.id, ctx.userId],
     );
@@ -575,8 +576,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     // 同时签发一枚 PAT，省得用户再自己走一遍
     const token = generateToken('ait');
     await db.query(
-      `insert into api_tokens (user_id, name, token_hash, scopes) values ($1,$2,$3,$4)`,
-      [user.id, 'initial', hashToken(token), ['tasks:read', 'tasks:write']],
+      `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
+      [user.id, 'initial', token, hashToken(token), ['tasks:read', 'tasks:write']],
     );
 
     return reply.code(201).send({
@@ -756,15 +757,15 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
       const token = generateToken('ait');
       await db.query(
-        `insert into api_tokens (user_id, name, token_hash, scopes) values ($1,$2,$3,$4)`,
-        [target.id, name, hashToken(token), ['tasks:read', 'tasks:write']],
+        `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
+        [target.id, name, token, hashToken(token), ['tasks:read', 'tasks:write']],
       );
       return { token, name, user_id: target.id, created_at: new Date().toISOString() };
     },
   );
 
   // ---------------------------------------------------------------- 令牌
-  // 令牌签发/吊销见下方「访问令牌」区块（/api/v1/tokens），管理员可替别人签发。
+  // 令牌签发/删除见下方「访问令牌」区块（/api/v1/tokens），管理员可替别人签发。
 
   // ---------------------------------------------------------------- 任务
 
@@ -1353,8 +1354,8 @@ export async function ensureBootstrapCredentials(
   if (!adminToken) {
     adminToken = generateToken('ait');
     await db.query(
-      `insert into api_tokens (user_id, name, token_hash, scopes) values ($1,$2,$3,$4)`,
-      [user.id, 'bootstrap (admin)', hashToken(adminToken), ['admin', 'tasks:read', 'tasks:write']],
+      `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
+      [user.id, 'bootstrap (admin)', adminToken, hashToken(adminToken), ['admin', 'tasks:read', 'tasks:write']],
     );
   }
 

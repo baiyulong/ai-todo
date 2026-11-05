@@ -1,5 +1,5 @@
 <script setup>
-/* 令牌管理：签发 / 吊销 MCP 访问令牌 */
+/* 令牌管理：签发 / 删除 MCP 访问令牌，支持随时复制 */
 
 import { ref, onMounted } from 'vue';
 import { api, translateError } from '../../api.js';
@@ -40,10 +40,10 @@ async function issue() {
   }
 }
 
-async function revoke(tk) {
+async function removeToken(tk) {
   try {
     await api.del(`/api/v1/tokens/${tk.id}`);
-    ui.toast(t('token.revokedToast'));
+    ui.toast(t('token.deletedToast'));
     await loadTokens();
   } catch (err) {
     ui.toast(translateError(err), true);
@@ -58,6 +58,8 @@ function formatTime(iso) {
 
 const lastUsed = (tk) =>
   tk.last_used_at ? t('token.lastUsed', { time: formatTime(tk.last_used_at) }) : t('token.neverUsed');
+
+const displayToken = (tk) => tk.token || `${tk.prefix}…`;
 
 async function copySecret(value) {
   const ok = await copyText(value);
@@ -86,14 +88,22 @@ onMounted(loadTokens);
           <div v-for="tk in tokens" :key="tk.id" class="token-row">
             <div class="token-info">
               <div class="token-name">{{ tk.name }}</div>
+              <code class="token-value" :title="tk.token ?? undefined">{{ displayToken(tk) }}</code>
               <div class="token-meta">{{ tk.revoked_at ? t('token.revoked') : t('token.valid') }} · {{ lastUsed(tk) }}</div>
             </div>
-            <button
-              v-if="!tk.revoked_at"
-              class="btn btn-sm btn-quiet btn-danger"
-              type="button"
-              @click="revoke(tk)"
-            >{{ t('token.revoke') }}</button>
+            <div class="token-actions">
+              <button
+                v-if="tk.token"
+                class="btn btn-sm btn-quiet"
+                type="button"
+                @click="copySecret(tk.token)"
+              >{{ t('token.copy') }}</button>
+              <button
+                class="btn btn-sm btn-quiet btn-danger"
+                type="button"
+                @click="removeToken(tk)"
+              >{{ t('token.delete') }}</button>
+            </div>
           </div>
         </div>
 
