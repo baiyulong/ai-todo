@@ -37,7 +37,7 @@ export const dict = {
   'topbar.tokens': 'Tokens',
   'topbar.users': 'Users',
   'topbar.logout': 'Sign out',
-  'topbar.rules': 'Notification rules',
+  'section.rules': 'Notification rules',
   'topbar.settings': 'Settings',
   'topbar.language': 'Switch language',
   'topbar.languageName': 'English',
@@ -132,7 +132,6 @@ export const dict = {
   'taskDialog.addedToast': 'Added',
 
   // ---------------- Drawer: settings ----------------
-  'drawer.rules': 'Notification rules',
   'drawer.settings': 'Settings',
   'drawer.close': 'Close',
   'section.status': 'Status',

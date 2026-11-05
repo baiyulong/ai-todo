@@ -77,7 +77,7 @@ export const useUiStore = defineStore('ui', () => {
       const saved = localStorage.getItem(THEME_KEY);
       if (saved && ['product', 'pixel', 'hacker'].includes(saved)) return saved;
     } catch { /* 隐私模式忽略 */ }
-    return 'product';
+    return 'pixel';
   }
 
   function setTheme(value) {

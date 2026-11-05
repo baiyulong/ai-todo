@@ -37,7 +37,7 @@ export const dict = {
   'topbar.tokens': '令牌管理',
   'topbar.users': '用户管理',
   'topbar.logout': '退出登录',
-  'topbar.rules': '通知规则',
+  'section.rules': '通知规则',
   'topbar.settings': '设置',
   'topbar.language': '切换语言',
   'topbar.languageName': '中文',
@@ -132,7 +132,6 @@ export const dict = {
   'taskDialog.addedToast': '已添加',
 
   // ---------------- 抽屉：设置 ----------------
-  'drawer.rules': '通知规则',
   'drawer.settings': '设置',
   'drawer.close': '关闭',
   'section.status': '状态',

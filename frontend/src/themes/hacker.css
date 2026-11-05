@@ -155,8 +155,8 @@
 [data-theme='hacker'] .status-row .k { color: var(--muted); }
 
 /* ------------------------------------------------------------
-   乱码雨：每 5 秒左右一串字符从上缓缓划过（JS 在 hackerFx.js 生成）
-   低透明度纯装饰，pointer-events: none 不挡任何交互
+   流星雨：细长荧光尾迹从屏幕上方划落，淡入淡出
+   （JS 在 hackerFx.js 生成）低透明度纯装饰，不挡任何交互
    ------------------------------------------------------------ */
 [data-theme='hacker'] .hacker-rain-layer {
   position: fixed;
@@ -165,23 +165,22 @@
   pointer-events: none;
   z-index: 5;
 }
-[data-theme='hacker'] .hacker-rain-col {
+[data-theme='hacker'] .hacker-meteor {
   position: absolute;
-  top: -40vh;
-  width: 1.4em;
-  word-break: break-all;
-  line-height: 1.5;
-  font-family: var(--mono);
-  color: var(--accent);
+  top: -220px;
+  width: 2px;
+  border-radius: 2px;
+  /* 尾迹：头部亮、尾部渐隐 */
+  background: linear-gradient(to bottom, rgba(51, 255, 102, 0), var(--accent) 85%, #ccffdd);
+  box-shadow: 0 0 8px rgba(51, 255, 102, 0.8);
   opacity: 0;
-  text-shadow: 0 0 10px rgba(51, 255, 102, 0.9);
-  animation-name: hacker-drop;
+  animation-name: hacker-meteor-fall;
   animation-timing-function: linear;
   animation-fill-mode: forwards;
 }
-@keyframes hacker-drop {
+@keyframes hacker-meteor-fall {
   0% { transform: translateY(0); opacity: 0; }
-  8% { opacity: 0.45; }
-  82% { opacity: 0.45; }
-  100% { transform: translateY(180vh); opacity: 0; }
+  12% { opacity: 0.55; }
+  78% { opacity: 0.55; }
+  100% { transform: translateY(130vh); opacity: 0; }
 }

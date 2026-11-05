@@ -12,6 +12,7 @@ import { requestNotifyPermission } from '../../composables/notify.js';
 import StatusRow from './StatusRow.vue';
 import EmailSection from './EmailSection.vue';
 import ThemeSection from './ThemeSection.vue';
+import RulesPanel from './RulesPanel.vue';
 
 const ui = useUiStore();
 const session = useSessionStore();
@@ -116,6 +117,12 @@ async function copyMcp() {
       style="margin-top: 10px"
       @click="requestNotifyPermission()"
     >{{ t('banner.enableBtn') }}</button>
+  </div>
+
+  <!-- 通知规则（原独立抽屉并入设置） -->
+  <div class="drawer-section">
+    <h3>{{ t('section.rules') }}</h3>
+    <RulesPanel />
   </div>
 
   <!-- 微信绑定：已登录的账号可以把自己的微信挂上来，之后就能直接扫码登录 -->

@@ -11,6 +11,14 @@ const session = useSessionStore();
 
 const menuOpen = ref(false);
 const userMenuRoot = ref(null);
+const themeOpen = ref(false);
+const themeMenuRoot = ref(null);
+
+const THEMES = [
+  { id: 'pixel', label: () => t('theme.pixel') },
+  { id: 'product', label: () => t('theme.product') },
+  { id: 'hacker', label: () => t('theme.hacker') },
+];
 
 const name = computed(() => session.me?.username || session.me?.display_name || '');
 const avatar = computed(() => name.value.slice(0, 1));
@@ -38,6 +46,7 @@ function toggleLocale() {
 
 function onDocClick(e) {
   if (userMenuRoot.value && !userMenuRoot.value.contains(e.target)) menuOpen.value = false;
+  if (themeMenuRoot.value && !themeMenuRoot.value.contains(e.target)) themeOpen.value = false;
 }
 
 onMounted(() => document.addEventListener('click', onDocClick));
@@ -63,7 +72,45 @@ async function logout() {
         <i></i><span>{{ liveText }}</span>
       </span>
 
-      <!-- 当前用户：点开可看账号信息、令牌/用户入口、退出登录 -->
+      <button class="icon-btn" type="button" :title="t('topbar.language')" @click="toggleLocale">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6" /><path d="m4 14 6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h1" /><path d="m22 22-5-10-5 10" /><path d="M14 18h6" /></svg>
+      </button>
+
+      <!-- 主题切换：下拉三选一，设置抽屉里也保留完整选择区 -->
+      <div ref="themeMenuRoot" class="user-menu">
+        <button
+          class="icon-btn"
+          type="button"
+          aria-haspopup="menu"
+          :aria-expanded="String(themeOpen)"
+          :title="t('section.theme')"
+          @click.stop="themeOpen = !themeOpen"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" /></svg>
+        </button>
+        <div v-if="themeOpen" class="user-dropdown theme-dropdown" role="menu">
+          <button
+            v-for="th in THEMES"
+            :key="th.id"
+            class="user-menu-item"
+            :class="{ 'is-active-option': ui.theme === th.id }"
+            type="button"
+            role="menuitem"
+            @click="ui.setTheme(th.id); themeOpen = false"
+          >
+            <svg v-if="ui.theme === th.id" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity: 0"><path d="M20 6 9 17l-5-5" /></svg>
+            <span>{{ th.label() }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 设置单一入口：通知规则已并入设置抽屉 -->
+      <button class="icon-btn" type="button" :title="t('topbar.settings')" @click="ui.openDrawer('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>
+      </button>
+
+      <!-- 当前用户：放在最右边，点开可看令牌/用户入口、退出登录 -->
       <div ref="userMenuRoot" class="user-menu">
         <button
           v-if="name"
@@ -99,16 +146,6 @@ async function logout() {
           </button>
         </div>
       </div>
-
-      <button class="icon-btn" type="button" :title="t('topbar.language')" @click="toggleLocale">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6" /><path d="m4 14 6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h1" /><path d="m22 22-5-10-5 10" /><path d="M14 18h6" /></svg>
-      </button>
-      <button class="icon-btn" type="button" :title="t('topbar.rules')" @click="ui.openDrawer('rules')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-      </button>
-      <button class="icon-btn" type="button" :title="t('topbar.settings')" @click="ui.openDrawer('settings')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>
-      </button>
     </div>
   </header>
 </template>

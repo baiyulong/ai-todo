@@ -177,6 +177,7 @@ a { color: var(--accent); }
   text-align: left;
 }
 .user-menu-item:hover { background: var(--accent-soft); }
+.user-menu-item.is-active-option { color: var(--accent); font-weight: 600; }
 .user-menu-item.is-danger { color: var(--danger); }
 .user-menu-item.is-danger:hover { background: var(--danger-soft); }
 .user-menu-item svg { width: 16px; height: 16px; flex: none; }
