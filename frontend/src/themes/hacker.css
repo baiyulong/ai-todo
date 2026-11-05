@@ -174,14 +174,14 @@
   font-family: var(--mono);
   color: var(--accent);
   opacity: 0;
-  text-shadow: 0 0 8px rgba(51, 255, 102, 0.55);
+  text-shadow: 0 0 10px rgba(51, 255, 102, 0.9);
   animation-name: hacker-drop;
   animation-timing-function: linear;
   animation-fill-mode: forwards;
 }
 @keyframes hacker-drop {
   0% { transform: translateY(0); opacity: 0; }
-  10% { opacity: 0.15; }
-  80% { opacity: 0.15; }
+  8% { opacity: 0.45; }
+  82% { opacity: 0.45; }
   100% { transform: translateY(180vh); opacity: 0; }
 }

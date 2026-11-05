@@ -17,7 +17,7 @@ function spawnColumn() {
   col.textContent = text;
   col.style.left = `${2 + Math.random() * 94}vw`;
   col.style.animationDuration = `${6 + Math.random() * 5}s`;
-  col.style.fontSize = `${11 + Math.random() * 4}px`;
+  col.style.fontSize = `${15 + Math.random() * 6}px`;
   col.addEventListener('animationend', () => col.remove());
   layer.appendChild(col);
 }
