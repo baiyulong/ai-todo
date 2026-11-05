@@ -419,6 +419,26 @@ button.src-chip:hover { border-color: var(--accent); color: var(--accent); }
 }
 @keyframes drawer-in { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* 左侧抽屉（新增任务表单） */
+.drawer-left {
+  left: 0;
+  right: auto;
+  border-left: none;
+  border-right: 1px solid var(--border);
+  animation: drawer-in-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes drawer-in-left { from { transform: translateX(-30px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.task-drawer-form .field { margin-bottom: 14px; }
+.drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
 .drawer-head {
   display: flex;
   align-items: center;

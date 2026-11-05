@@ -23,7 +23,7 @@ import UsersView from './components/views/UsersView.vue';
 import TokensView from './components/views/TokensView.vue';
 import AppDrawer from './components/layout/AppDrawer.vue';
 import ToastCenter from './components/layout/ToastCenter.vue';
-import TaskFormDialog from './components/dialogs/TaskFormDialog.vue';
+import TaskFormDrawer from './components/dialogs/TaskFormDrawer.vue';
 import ConfirmDialog from './components/dialogs/ConfirmDialog.vue';
 import WechatBindDialog from './components/dialogs/WechatBindDialog.vue';
 import TokenDialog from './components/dialogs/TokenDialog.vue';
@@ -167,7 +167,7 @@ onUnmounted(() => {
 
   <!-- 抽屉与全局对话框挂在根层，视图切换不影响它们 -->
   <AppDrawer />
-  <TaskFormDialog />
+  <TaskFormDrawer />
   <ConfirmDialog />
   <WechatBindDialog />
   <TokenDialog />
