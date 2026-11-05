@@ -211,6 +211,7 @@
   transform: translateY(1px);
 }
 
+[data-theme='pixel'] .tabs,
 [data-theme='pixel'] .tab,
 [data-theme='pixel'] .tag,
 [data-theme='pixel'] .src-chip,

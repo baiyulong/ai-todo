@@ -57,6 +57,37 @@
   color-scheme: light;
 }
 
+/* ------------------------------------------------------------
+   下拉弹层自定义（Chromium 的 customizable <select>）：
+   让展开的选项列表继承毛玻璃 + 大圆角，和下拉框本体一致。
+   不支持 appearance: base-select 的浏览器自动回退原生弹层，无副作用。
+   ------------------------------------------------------------ */
+[data-theme='product'] select.select {
+  appearance: base-select;
+}
+[data-theme='product'] select.select::picker(select) {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--dropdown-bg);
+  box-shadow: var(--shadow-md);
+  padding: 5px;
+  margin-top: 4px;
+}
+[data-theme='product'] select.select option {
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+[data-theme='product'] select.select option:hover,
+[data-theme='product'] select.select option:focus {
+  background: var(--accent-soft);
+}
+[data-theme='product'] select.select option:checked {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 @media (prefers-color-scheme: dark) {
   :root,
   [data-theme='product'] {
