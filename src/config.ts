@@ -74,8 +74,11 @@ export interface MailConfig {
   user: string;
   /** 认证凭据：授权码（QQ/163 等云邮箱）或密码，走 nodemailer 的 auth.pass */
   pass: string;
-  /** 发件人，如 "AI Todo <no-reply@example.com>" */
-  from: string;
+  /**
+   * 发件人。address 保证是合法邮箱——QQ 等服务商在 MAIL FROM 阶段就校验
+   * 地址格式与账号归属，带中文引号 / 残缺显示名的原始串会被直接拒收（502）。
+   */
+  from: { name: string; address: string };
 }
 
 export interface Config {
@@ -137,7 +140,23 @@ export function loadConfig(): Config {
     // QQ / 163 / Gmail 等云邮箱要求用「授权码」而非登录密码，值里可能含空格，
     // 统一去掉首尾空白（授权码中间的空格不受影响）。
     pass: (process.env.AI_TODO_SMTP_AUTH_CODE ?? process.env.AI_TODO_SMTP_PASS ?? '').trim(),
-    from: process.env.AI_TODO_SMTP_FROM?.trim() || `AI Todo <${process.env.AI_TODO_SMTP_USER?.trim() || 'no-reply@localhost'}>`,
+    // 发件人规整：FROM 里可能写「显示名 <地址>」、纯地址，也可能手滑带中文引号。
+    // 一律拆出地址；地址不合法则回落 SMTP_USER，还不行才用 no-reply@localhost。
+    // QQ SMTP 要求 MAIL FROM 必须是认证账号本身，所以回落顺序不能反。
+    from: (() => {
+      const smtpUser = process.env.AI_TODO_SMTP_USER?.trim() || '';
+      const fromRaw = process.env.AI_TODO_SMTP_FROM?.trim() || '';
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test.bind(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+      const m = fromRaw.match(/<([^<>]*)>/);
+      const addr = (m ? m[1] : fromRaw).trim().replace(/^["'\u201c\u201d]+|["'\u201c\u201d]+$/g, '');
+      const name = m
+        ? fromRaw.slice(0, m.index).trim().replace(/^["'\u201c\u201d]+|["'\u201c\u201d]+$/g, '')
+        : '';
+      return {
+        name,
+        address: isEmail(addr) ? addr : isEmail(smtpUser) ? smtpUser : 'no-reply@localhost',
+      };
+    })(),
   };
 
   return {

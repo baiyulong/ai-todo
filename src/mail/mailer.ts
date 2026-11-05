@@ -56,15 +56,23 @@ export function createMailer(config: MailConfig): Mailer {
     async send(payload) {
       try {
         await transport.sendMail({
-          from: config.from,
+          // display name 交给 nodemailer 做非 ASCII 编码；为空时传纯地址字符串
+          from: config.from.name ? config.from : config.from.address,
           to: payload.to,
           subject: payload.subject,
           text: payload.text,
           html: payload.html,
         });
       } catch (err) {
-        // 吞掉异常只记日志：调用方（建任务 / 转交）不该因 SMTP 故障失败
-        console.error('[mail] 发送失败', payload.to, payload.subject, err);
+        // 吞掉异常只记日志：调用方（建任务 / 转交）不该因 SMTP 故障失败。
+        // from 地址一起打出来——QQ/163 报 502 十有八九是 MAIL FROM 地址问题。
+        console.error(
+          '[mail] 发送失败',
+          `from=${config.from.address}`,
+          `to=${payload.to}`,
+          payload.subject,
+          err,
+        );
       }
     },
     async verify() {
