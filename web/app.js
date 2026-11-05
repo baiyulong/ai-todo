@@ -1792,8 +1792,8 @@ function userTableRow(isHead, u) {
   if (u.is_admin) cellRole.classList.add('mgmt-role-admin');
 
   const status = document.createElement('span');
-  status.className = 'tag ' + (u.is_active ? 'st-acked' : 'sev-blocker');
-  status.textContent = u.is_active ? t('user.flagNormal') : t('user.flagDisabled');
+  status.className = 'tag st-acked';
+  status.textContent = t('user.flagNormal');
   cellStatus.appendChild(status);
   if (u.wechat_openid) {
     const wx = document.createElement('span');
@@ -1802,26 +1802,7 @@ function userTableRow(isHead, u) {
     cellStatus.appendChild(wx);
   }
 
-  // 不能禁用 / 启用自己：把自己禁了就只能去改数据库了
   const isSelf = state.me && u.id === state.me.id;
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = u.is_active ? 'btn btn-sm btn-quiet btn-danger' : 'btn btn-sm btn-quiet';
-  toggle.textContent = u.is_active ? t('user.disable') : t('user.enable');
-  if (isSelf) {
-    toggle.disabled = true;
-    toggle.title = t('user.selfToggleHint');
-  }
-  toggle.addEventListener('click', async () => {
-    try {
-      await api.patch(`/api/v1/admin/users/${u.id}`, { is_active: !u.is_active });
-      toast(u.is_active ? t('user.disabledToast') : t('user.enabledToast'));
-      renderUsersPage();
-    } catch (err) {
-      toast(translateError(err), true);
-    }
-  });
-  cellActions.appendChild(toggle);
 
   // 重置密码：服务端随机生成新密码，邮件发给用户本人；
   // 邮件走不通（没绑邮箱 / SMTP 未配置）时界面摊开显示一次。

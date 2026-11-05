@@ -1552,25 +1552,6 @@ async function main() {
   /* 清理 */
   console.log('\n[清理] 归档测试任务并删除测试账号');
 
-  // 禁用账号：令牌与会话应立即失效
-  const usersList = await api('/api/v1/admin/users');
-  const targetUser = usersList.body.users.find((u) => u.username === newUser);
-  const disabled = await api(`/api/v1/admin/users/${targetUser.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ is_active: false }),
-  });
-  check('管理员可以禁用账号', disabled.res.status === 200, `HTTP ${disabled.res.status}`);
-
-  const afterDisable = await userApi('/api/v1/tasks', { token: createdUser.body.token });
-  check('禁用账号后其令牌立即失效', afterDisable.res.status === 401, `HTTP ${afterDisable.res.status}`);
-
-  const disabledLogin = await fetch(`${BASE}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: newUser, password: createdUser.body.password }),
-  });
-  check('禁用账号后不能登录', disabledLogin.status === 401, `HTTP ${disabledLogin.status}`);
-
   const all = await api('/api/v1/tasks?status=pending,acked,done&limit=200');
   const junk = all.body.tasks.filter(
     (t) =>
@@ -1584,7 +1565,7 @@ async function main() {
   }
   check(`已归档 ${junk.length} 条测试任务`, junk.length > 0, String(junk.length));
 
-  const deleted = await api(`/api/v1/admin/users/${targetUser.id}`, { method: 'DELETE' });
+  const deleted = await api(`/api/v1/admin/users/${createdUser.body.user.id}`, { method: 'DELETE' });
   check('管理员可以删除测试账号', deleted.res.status === 200, `HTTP ${deleted.res.status}`);
 
   await sse.close();

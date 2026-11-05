@@ -301,7 +301,7 @@ export function registerWechatRoutes(deps: WechatRouteDeps): void {
     }
 
     const user = await users.findById(row.user_id);
-    if (!user || !user.is_active) {
+    if (!user) {
       return { status: 'failed', purpose: row.purpose, error_code: 'wechat_account_disabled' };
     }
 
@@ -557,13 +557,6 @@ async function completeWechatAuth(
       issuedToken = await issuePat(db, user.id, '微信登录自动签发');
     }
   } else {
-    if (!user.is_active) {
-      await db.query(
-        `update auth_pending_logins set status='failed', error_code=$2 where state=$1`,
-        [state, 'wechat_account_disabled'],
-      );
-      throw new WechatError('wechat_account_disabled', '账号已被禁用');
-    }
     // 刷新昵称头像（同一个微信用过之后改名、改头像都能同步过来）
     try {
       user = await users.linkWechat(user.id, {

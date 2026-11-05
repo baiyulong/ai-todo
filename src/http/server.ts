@@ -311,7 +311,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     const res = await db.query<{ id: string; user_id: string; revoked_at: string | null }>(
       `select t.id, t.user_id, t.revoked_at from api_tokens t
        join users u on u.id = t.user_id
-       where t.token_hash = $1 and u.is_active`,
+       where t.token_hash = $1`,
       [hashToken(body.data.token)],
     );
     const row = res.rows[0];
@@ -598,7 +598,6 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
       const body = z
         .object({
-          is_active: z.boolean().optional(),
           is_admin: z.boolean().optional(),
           password: z.string().min(8).max(200).optional(),
           display_name: z.string().max(120).nullable().optional(),
@@ -615,7 +614,6 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       }
 
       const p = body.data;
-      if (p.is_active !== undefined) await users.setActive(target.id, p.is_active);
       if (p.is_admin !== undefined) await users.setAdmin(target.id, p.is_admin);
       if (p.display_name !== undefined) await users.setDisplayName(target.id, p.display_name);
       if (p.email !== undefined) {
@@ -889,10 +887,10 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       }
 
       const target = await users.findById(body.data.to_user_id);
-      if (!target || !target.is_active) {
+      if (!target) {
         return reply
           .code(400)
-          .send({ error: { code: 'user_not_found', message: '转交目标不存在或已被禁用' } });
+          .send({ error: { code: 'user_not_found', message: '转交目标不存在' } });
       }
       if (target.id === ctx.userId) {
         return reply
@@ -1223,7 +1221,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       email: string | null;
     }>(
       `select id, username, display_name, email from users
-        where is_active and username is not null
+        where username is not null
         order by username asc`,
     );
     return { users: res.rows };

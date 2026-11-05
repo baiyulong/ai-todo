@@ -26,7 +26,7 @@ const USAGE = `AI Todo
 用法：
   ai-todo serve      启动 Web 服务与通知编排（默认命令）
   ai-todo mcp        以 stdio 方式运行 MCP Server（供 AI 客户端拉起）
-  ai-todo user       用户管理：add / list / passwd / enable / disable / token
+  ai-todo user       用户管理：add / list / passwd / token
   ai-todo token      签发一个新的访问令牌
   ai-todo migrate    仅执行数据库迁移
   ai-todo cloud      CloudBase 云端同步：push / pull / status
@@ -34,7 +34,7 @@ const USAGE = `AI Todo
 示例：
   ai-todo user add alice --email=alice@x.com   建号并打印初始密码与访问令牌
   ai-todo user list                   列出所有账号
-  ai-todo user disable alice          禁用账号（同时吊销其令牌与会话）
+  ai-todo user passwd alice           重置 alice 的密码（打印一次新密码）
   ai-todo user token alice --name=claude  为 alice 签发一枚 MCP 用的令牌
   ai-todo cloud push                  把本地全部任务备份到 CloudBase PostgreSQL
   ai-todo cloud pull                  从云端恢复本地缺失的任务（不触发通知）
@@ -247,7 +247,7 @@ async function userCommand(): Promise<void> {
     console.log('  用户列表');
     console.log('  ─────────────────────────────────────────');
     for (const u of users) {
-      const flags = [u.is_admin ? '管理员' : null, u.is_active ? null : '已禁用'].filter(Boolean);
+      const flags = [u.is_admin ? '管理员' : null].filter(Boolean);
       console.log(
         `  ${(u.username ?? '(无用户名)').padEnd(16)} ${u.display_name ?? ''}${
           flags.length ? `  [${flags.join(' / ')}]` : ''
@@ -291,7 +291,7 @@ async function userCommand(): Promise<void> {
 
   const target = positional(1);
   if (!target) {
-    console.error('用法：ai-todo user <passwd|enable|disable|token> <用户名>');
+    console.error('用法：ai-todo user <passwd|delete|token> <用户名>');
     process.exit(1);
   }
 
@@ -312,16 +312,6 @@ async function userCommand(): Promise<void> {
     console.log(`  新密码 ${payload.password}`);
     console.log('');
     console.log('  只显示这一次，请立即保存。');
-    console.log('');
-    return;
-  }
-
-  if (sub === 'enable' || sub === 'disable') {
-    await call('PATCH', `/api/v1/admin/users/${user.id}`, { is_active: sub === 'enable' });
-    console.log(`  ${user.username} 已${sub === 'enable' ? '启用' : '禁用'}`);
-    if (sub === 'disable') {
-      console.log('  其会话与访问令牌已一并吊销。');
-    }
     console.log('');
     return;
   }

@@ -26,14 +26,12 @@ interface TokenRow {
   name: string;
   scopes: string[];
   revoked_at: string | null;
-  is_active: boolean;
 }
 
 interface SessionRow {
   id: string;
   user_id: string;
   expires_at: string;
-  is_active: boolean;
   is_admin: boolean;
 }
 
@@ -46,15 +44,13 @@ interface SessionRow {
  */
 export async function resolvePatToken(db: Db, token: string): Promise<AuthContext | null> {
   const res = await db.query<TokenRow>(
-    `select t.id, t.user_id, t.name, t.scopes, t.revoked_at, u.is_active
+    `select t.id, t.user_id, t.name, t.scopes, t.revoked_at
      from api_tokens t join users u on u.id = t.user_id
      where t.token_hash = $1`,
     [hashToken(token)],
   );
   const row = res.rows[0];
   if (!row || row.revoked_at) return null;
-  // 账号被禁用后，其令牌立即失效
-  if (!row.is_active) return null;
   await db.query(`update api_tokens set last_used_at = now() where id = $1`, [row.id]);
   return { userId: row.user_id, scopes: row.scopes, via: 'pat' };
 }
@@ -71,7 +67,7 @@ export async function resolvePatToken(db: Db, token: string): Promise<AuthContex
 export function createAuthenticator(db: Db, cookieName: string) {
   const resolveSession = async (token: string): Promise<AuthContext | null> => {
     const res = await db.query<SessionRow>(
-      `select s.id, s.user_id, s.expires_at, u.is_active, u.is_admin
+      `select s.id, s.user_id, s.expires_at, u.is_admin
        from sessions s join users u on u.id = s.user_id
        where s.token_hash = $1`,
       [hashToken(token)],
@@ -79,7 +75,6 @@ export function createAuthenticator(db: Db, cookieName: string) {
     const row = res.rows[0];
     if (!row) return null;
     if (new Date(row.expires_at).getTime() < Date.now()) return null;
-    if (!row.is_active) return null;
     await db.query(`update sessions set last_seen_at = now() where id = $1`, [row.id]);
     const scopes = ['tasks:read', 'tasks:write'];
     if (row.is_admin) scopes.push('admin');

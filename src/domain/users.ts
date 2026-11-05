@@ -8,7 +8,6 @@ export interface User {
   display_name: string | null;
   email: string | null;
   is_admin: boolean;
-  is_active: boolean;
   created_at: string;
   /** 登录方式：password | wechat | both */
   auth_provider: string;
@@ -25,7 +24,6 @@ interface UserRow {
   email: string | null;
   password_hash: string | null;
   is_admin: boolean;
-  is_active: boolean;
   created_at: string;
   auth_provider: string;
   wechat_openid: string | null;
@@ -34,7 +32,7 @@ interface UserRow {
 }
 
 const USER_COLUMNS =
-  'id, username, display_name, email, is_admin, is_active, created_at, ' +
+  'id, username, display_name, email, is_admin, created_at, ' +
   'auth_provider, wechat_openid, wechat_nickname, avatar_url';
 
 /** 用户名：小写字母、数字、点、下划线、连字符，3–32 位 */
@@ -133,9 +131,9 @@ export class UserService {
 
     const res = await this.db.query<UserRow>(
       `insert into users
-         (username, display_name, email, password_hash, is_admin, is_active,
+         (username, display_name, email, password_hash, is_admin,
           wechat_openid, wechat_unionid, wechat_nickname, avatar_url, auth_provider)
-       values ($1,$2,null,null,$3,true,$4,$5,$6,$7,'wechat')
+       values ($1,$2,null,null,$3,$4,$5,$6,$7,'wechat')
        returning ${USER_COLUMNS}`,
       [
         username,
@@ -243,8 +241,8 @@ export class UserService {
 
     const passwordHash = await hashPassword(input.password);
     const res = await this.db.query<UserRow>(
-      `insert into users (username, display_name, email, password_hash, is_admin, is_active)
-       values ($1,$2,$3,$4,$5,true)
+      `insert into users (username, display_name, email, password_hash, is_admin)
+       values ($1,$2,$3,$4,$5)
        returning ${USER_COLUMNS}`,
       [
         username,
@@ -257,7 +255,7 @@ export class UserService {
     return res.rows[0];
   }
 
-  /** 用户名 + 密码校验；账号被禁用或密码为空一律失败 */
+  /** 用户名 + 密码校验；密码为空（微信-only 账号）一律失败 */
   async authenticate(username: string, password: string): Promise<User | null> {
     const res = await this.db.query<UserRow>(
       `select ${USER_COLUMNS}, password_hash from users where username = $1`,
@@ -265,7 +263,6 @@ export class UserService {
     );
     const row = res.rows[0];
     if (!row || !row.password_hash) return null;
-    if (!row.is_active) return null;
 
     const ok = await verifyPassword(password, row.password_hash);
     if (!ok) return null;
@@ -299,18 +296,6 @@ export class UserService {
       [userId],
     );
     return !!res.rows[0]?.password_hash;
-  }
-
-  async setActive(userId: string, active: boolean): Promise<void> {
-    await this.db.query(`update users set is_active = $2 where id = $1`, [userId, active]);
-    // 禁用账号即刻吊销其会话与令牌，避免已登录的浏览器继续访问
-    if (!active) {
-      await this.db.query(`delete from sessions where user_id = $1`, [userId]);
-      await this.db.query(
-        `update api_tokens set revoked_at = now() where user_id = $1 and revoked_at is null`,
-        [userId],
-      );
-    }
   }
 
   async setAdmin(userId: string, isAdmin: boolean): Promise<void> {
@@ -369,7 +354,7 @@ export class UserService {
       const row = legacy.rows[0];
       const hash = await hashPassword(password);
       await this.db.query(
-        `update users set username = $2, password_hash = $3, is_admin = true, is_active = true where id = $1`,
+        `update users set username = $2, password_hash = $3, is_admin = true where id = $1`,
         [row.id, username, hash],
       );
       const user = await this.findById(row.id);

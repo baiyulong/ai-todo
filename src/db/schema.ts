@@ -31,11 +31,12 @@ create table if not exists users (
   created_at   timestamptz not null default now()
 );
 
--- 账号体系升级（v2）：用户名 + 密码登录 + 启用状态 + 管理员标记
+-- 账号体系升级（v2）：用户名 + 密码登录 + 管理员标记
 alter table users add column if not exists username text;
 alter table users add column if not exists password_hash text;
 alter table users add column if not exists is_admin boolean not null default false;
-alter table users add column if not exists is_active boolean not null default true;
+-- 禁用功能已移除（有删除功能就够了）：老库里的 is_active 列一并清掉
+alter table users drop column if exists is_active;
 
 -- 用户名唯一（小写归一化后存库），空用户名的老数据不受影响
 create unique index if not exists users_username_uq
