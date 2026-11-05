@@ -639,6 +639,68 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     },
   );
 
+  // 管理员重置密码：生成随机新密码，以邮件发给用户本人。
+  // 邮件通道走不通（用户没绑邮箱 / SMTP 未配置）时把新密码直接返回，
+  // 由管理界面摊开显示一次，管理员线下转达——密码永远不该长期留在界面或日志里。
+  app.post<{ Params: { id: string } }>(
+    '/api/v1/admin/users/:id/reset-password',
+    { preHandler: authHooks },
+    async (req, reply) => {
+      const ctx = currentAuth(req);
+      if (!ctx.scopes.includes('admin')) {
+        return reply.code(403).send({ error: { code: 'forbidden', message: '需要 admin 权限' } });
+      }
+      const target = await users.findById(req.params.id);
+      if (!target) {
+        return reply.code(404).send({ error: { code: 'user_not_found', message: '用户不存在' } });
+      }
+
+      const password = generatePassword(20);
+      await users.setPassword(target.id, password);
+
+      // 重置通常发生在「旧密码可能已经泄露 / 用户忘记」的场景：
+      // 全部旧会话一起吊销，拿到旧 Cookie 的人不能赖着不走。
+      await db.query(`delete from sessions where user_id = $1`, [target.id]);
+
+      if (target.email && mailer.enabled) {
+        const loginUrl = `${config.baseUrl}/login`;
+        const text = [
+          `你好 ${target.username}，`,
+          '',
+          `管理员重置了你的 AI Todo 登录密码。`,
+          '',
+          `新密码：${password}`,
+          '',
+          `登录地址：${loginUrl}`,
+          '登录后请尽快在「设置 → 修改密码」里改成自己的密码。',
+          '如果不是你本人请求重置，请联系管理员。',
+        ].join('\n');
+        const html = `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px">
+  <h2 style="margin:0 0 12px">密码已重置</h2>
+  <p style="margin:0 0 8px">你好 <b>${target.username}</b>，管理员重置了你的 AI Todo 登录密码。</p>
+  <p style="margin:12px 0">新密码：<code style="font-size:16px;padding:4px 10px;background:#f2f3f5;border-radius:6px">${password}</code></p>
+  <p style="margin:12px 0 0"><a href="${loginUrl}">打开 AI Todo 登录</a>，登录后请尽快在「设置 → 修改密码」里改成自己的密码。</p>
+  <p style="margin:12px 0 0;color:#888">如果不是你本人请求重置，请联系管理员。</p>
+</div>`;
+        await mailer.send({
+          to: target.email,
+          subject: '[AI Todo] 你的密码已被管理员重置',
+          text,
+          html,
+        });
+        return { ok: true, email_sent: true, email: target.email };
+      }
+
+      // 邮件走不通：把明文密码交给界面，只显示这一次
+      return {
+        ok: true,
+        email_sent: false,
+        reason: target.email ? 'smtp_not_configured' : 'no_email',
+        password,
+      };
+    },
+  );
+
   // 删除账号（管理员）
   app.delete<{ Params: { id: string } }>(
     '/api/v1/admin/users/:id',

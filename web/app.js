@@ -1666,7 +1666,7 @@ function renderUsersPage() {
       uname.value = '';
       uemail.value = '';
       // 初始密码与令牌只显示一次：摊开在页面里，复制按钮伺候
-      state.freshUserCredentials = { username: res.user.username, password: res.password, token: res.token };
+      state.freshUserCredentials = { kind: 'created', username: res.user.username, password: res.password, token: res.token };
       if (res.token) state.lastToken = res.token;
       toast(t('user.createdToast', { username: res.user.username }));
       renderUsersPage();
@@ -1802,6 +1802,33 @@ function userTableRow(isHead, u) {
   });
   cellActions.appendChild(toggle);
 
+  // 重置密码：服务端随机生成新密码，邮件发给用户本人；
+  // 邮件走不通（没绑邮箱 / SMTP 未配置）时界面摊开显示一次。
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'btn btn-sm btn-quiet';
+  reset.textContent = t('user.reset');
+  reset.title = u.email ? t('user.resetTitle', { email: u.email }) : t('user.resetNoEmailHint');
+  reset.addEventListener('click', async () => {
+    const name = u.username || t('user.noUsername');
+    // 重置会强制对方全部下线，属于打扰性动作，先确认
+    if (!window.confirm(t('user.resetConfirm', { username: name }))) return;
+    try {
+      const res = await api.post(`/api/v1/admin/users/${u.id}/reset-password`);
+      if (res.email_sent) {
+        toast(t('user.resetSentToast', { email: res.email }));
+      } else {
+        // 邮件通道不可用：密码只在这里显示一次，管理员线下转达
+        state.freshUserCredentials = { kind: 'reset', username: u.username, password: res.password, token: null };
+        renderUsersPage();
+        toast(t('user.resetFallbackToast'), true);
+      }
+    } catch (err) {
+      toast(translateError(err), true);
+    }
+  });
+  cellActions.appendChild(reset);
+
   row.append(cellUser, cellRole, cellStatus, cellActions);
   return row;
 }
@@ -1813,7 +1840,10 @@ function credentialsCard(creds) {
 
   const label = document.createElement('div');
   label.className = 'token-secret-label';
-  label.textContent = t('user.createdFor', { username: creds.username });
+  // 建号与重置密码共用这张一次性凭据卡，标题按来源区分
+  label.textContent = creds.kind === 'reset'
+    ? t('user.resetFor', { username: creds.username })
+    : t('user.createdFor', { username: creds.username });
   card.appendChild(label);
 
   const passLabel = document.createElement('div');
