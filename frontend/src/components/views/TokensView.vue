@@ -119,15 +119,6 @@ onMounted(loadTokens);
           {{ t('token.issue') }}
         </button>
       </div>
-
-      <!-- 刚签发的令牌（只显示这一次） -->
-      <div v-if="session.lastToken" class="mgmt-card token-secret">
-        <div class="token-secret-label">{{ t('token.freshLabel') }}</div>
-        <div class="qr-token-row">
-          <code>{{ session.lastToken }}</code>
-          <button class="btn btn-sm" type="button" @click="copySecret(session.lastToken)">{{ t('token.copy') }}</button>
-        </div>
-      </div>
     </div>
   </section>
 </template>

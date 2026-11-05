@@ -223,7 +223,6 @@ export const dict = {
   'token.namePlaceholder': 'Token name, e.g. claude-code',
   'token.issue': 'Issue new token',
   'token.issuedToast': 'Token issued — copy it now',
-  'token.freshLabel': 'Freshly issued token',
   'token.copy': 'Copy',
   'token.copiedToast': 'Copied',
   'token.copyFailedToast': 'Copy failed — select it and copy manually',

@@ -223,7 +223,6 @@ export const dict = {
   'token.namePlaceholder': '令牌名称，如 claude-code',
   'token.issue': '签发新令牌',
   'token.issuedToast': '令牌已签发，请立即复制保存',
-  'token.freshLabel': '刚签发的令牌',
   'token.copy': '复制',
   'token.copiedToast': '已复制',
   'token.copyFailedToast': '复制失败，请手动选中复制',

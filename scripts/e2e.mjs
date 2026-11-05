@@ -761,11 +761,15 @@ async function main() {
   check(
     '令牌列表返回明文（可随时复制）',
     tokenList.body.tokens.length > 0 &&
-      tokenList.body.tokens.every((t) => t.token === selfIssued.body.token || typeof t.token === 'string'),
+      tokenList.body.tokens.every((t) => typeof t.token === 'string'),
     JSON.stringify(tokenList.body.tokens[0]),
   );
 
-  const delRes = await userApi(`/api/v1/tokens/${tokenList.body.tokens[0].id}`, { method: 'DELETE' });
+  const times = tokenList.body.tokens.map((t) => new Date(t.created_at).getTime());
+  check('令牌列表按创建时间升序（历史在前）', times.every((v, i) => i === 0 || times[i - 1] <= v), JSON.stringify(times));
+
+  const issuedRow = tokenList.body.tokens.find((t) => t.token === selfIssued.body.token);
+  const delRes = await userApi(`/api/v1/tokens/${issuedRow.id}`, { method: 'DELETE' });
   check('可以删除自己的令牌', delRes.res.status === 200, `HTTP ${delRes.res.status}`);
 
   const afterDelete = await userApi('/api/v1/tasks', { token: selfIssued.body.token });
@@ -774,7 +778,7 @@ async function main() {
   const afterDeleteList = await userApi('/api/v1/tokens', { cookie: userCookie });
   check(
     '删除后令牌从列表移除',
-    afterDeleteList.body.tokens.every((t) => t.id !== tokenList.body.tokens[0].id),
+    afterDeleteList.body.tokens.every((t) => t.id !== issuedRow.id),
     JSON.stringify(afterDeleteList.body.tokens.map((t) => t.id)),
   );
 

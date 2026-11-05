@@ -456,7 +456,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       revoked_at: string | null;
     }>(
       `select id, name, token, left(token_hash, 8) as prefix, created_at, last_used_at, revoked_at
-       from api_tokens where user_id = $1 order by created_at desc`,
+       from api_tokens where user_id = $1 order by created_at asc`,
       [ctx.userId],
     );
     return { tokens: res.rows };
