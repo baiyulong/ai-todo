@@ -33,7 +33,9 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
       capabilities: { tools: {}, resources: {} },
       instructions:
         'AI Todo：把需要用户关注的事项推进待办列表。AI 完成一个任务后，用 todo_create 告知用户接下来需要人工确认、决策或验收的部分。' +
-        '只推真正需要人介入的事；纯进度更新不要调用。notify=false 表示只记录不打扰用户。',
+        '只推真正需要人介入的事；纯进度更新不要调用。notify=false 表示只记录不打扰用户。' +
+        '如果需要用户的答复才能继续：todo_create 会返回 task_id，询问用户后调用 todo_wait_reply 挂起等待；' +
+        '用户在网页上回复后任务完成，回复内容随工具结果返回，据此继续完成任务。',
     },
   );
 
@@ -99,11 +101,14 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
         });
 
         const prefix = created ? '已记录' : '已存在（幂等命中，未重复提醒）';
+        const hint = created
+          ? '。如需等待用户答复后继续，可调用 todo_wait_reply 传入这个 task_id'
+          : '';
         return {
           content: [
             {
               type: 'text' as const,
-              text: `${prefix} #${task.id.slice(0, 8)}：${task.title}`,
+              text: `${prefix} #${task.id.slice(0, 8)}：${task.title}${hint}`,
             },
           ],
           structuredContent: {
@@ -271,6 +276,106 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
         return {
           content: [{ type: 'text' as const, text: `已推迟到 ${task.due_at}` }],
           structuredContent: { task_id: task.id, due_at: task.due_at },
+        };
+      } catch (error) {
+        return fail(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'todo_get_reply',
+    {
+      title: '查询任务回复',
+      description: '即时查询用户对某个任务的回复（不等待）。回复后任务状态为 done。适合不想挂起的客户端低频轮询。',
+      inputSchema: {
+        id: z.string().min(1).describe('任务 ID'),
+      },
+    },
+    async (args) => {
+      try {
+        const { task, replied } = await api.getReply(args.id);
+        if (replied) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `用户已回复 #${task.id.slice(0, 8)}：${task.reply_text}`,
+              },
+            ],
+            structuredContent: {
+              task_id: task.id,
+              status: task.status,
+              replied: true,
+              reply: task.reply_text,
+              replied_at: task.replied_at,
+            },
+          };
+        }
+        const note =
+          task.status === 'done'
+            ? '任务已完成，但没有留下文字回复。'
+            : task.status === 'archived'
+              ? '任务已被归档，不会有回复了。'
+              : '用户尚未回复。';
+        return {
+          content: [{ type: 'text' as const, text: `#${task.id.slice(0, 8)} ${note}` }],
+          structuredContent: { task_id: task.id, status: task.status, replied: false },
+        };
+      } catch (error) {
+        return fail(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'todo_wait_reply',
+    {
+      title: '等待任务回复',
+      description:
+        '挂起等待用户在网页上回复指定任务，用户一回复立刻返回回复内容。' +
+        '超时未回复返回 replied=false，可再次调用继续等待（推荐循环调用直到拿到回复或任务被归档）。' +
+        '上限 25 秒是为了避开 MCP 客户端默认的工具调用超时（通常约 60 秒）。',
+      inputSchema: {
+        id: z.string().min(1).describe('任务 ID'),
+        timeout: z
+          .number()
+          .int()
+          .min(1)
+          .max(25)
+          .optional()
+          .describe('最长等待秒数，默认 20，上限 25'),
+      },
+    },
+    async (args) => {
+      try {
+        const { task, replied } = await api.getReply(args.id, args.timeout ?? 20);
+        if (replied) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `用户已回复 #${task.id.slice(0, 8)}：${task.reply_text}`,
+              },
+            ],
+            structuredContent: {
+              task_id: task.id,
+              status: task.status,
+              replied: true,
+              reply: task.reply_text,
+              replied_at: task.replied_at,
+            },
+          };
+        }
+        const note =
+          task.status === 'archived'
+            ? '任务已被归档，停止等待。'
+            : task.status === 'done'
+              ? '任务已标记完成，但没有留下文字回复。'
+              : '等待超时，用户尚未回复；如需继续等待可再次调用本工具。';
+        return {
+          content: [{ type: 'text' as const, text: `#${task.id.slice(0, 8)} ${note}` }],
+          structuredContent: { task_id: task.id, status: task.status, replied: false },
         };
       } catch (error) {
         return fail(error);

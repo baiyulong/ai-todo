@@ -96,6 +96,10 @@ export const dict = {
   'task.transferPlaceholder': 'Hand off to…',
   'task.transferPick': 'Pick a person first',
   'task.transferredToast': 'Handed off to {user} — they have been notified',
+  'task.replyLabel': 'Your reply',
+  'task.replyPlaceholder': 'Reply to this task — it is marked done and the waiting AI receives it right away',
+  'task.reply': 'Reply',
+  'task.repliedToast': 'Replied — the AI will receive your answer',
 
   // ---------------- Actions ----------------
   'action.ack': 'Take',

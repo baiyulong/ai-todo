@@ -104,6 +104,15 @@ export class TodoApiClient {
     return this.request('POST', `/api/v1/tasks/${id}/snooze`, { until });
   }
 
+  /**
+   * 查询任务回复；waitSec > 0 时服务端长轮询挂起，
+   * 用户一回复立刻返回（MCP todo_wait_reply 的底座）。
+   */
+  getReply(id: string, waitSec = 0): Promise<{ task: Task; replied: boolean }> {
+    const qs = waitSec > 0 ? `?wait=${waitSec}` : '';
+    return this.request('GET', `/api/v1/tasks/${id}/reply${qs}`);
+  }
+
   getRules(): Promise<{ rules: Record<string, unknown> }> {
     return this.request('GET', '/api/v1/rules');
   }

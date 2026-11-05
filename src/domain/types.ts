@@ -25,6 +25,9 @@ export interface Task {
   updated_at: string;
   acked_at: string | null;
   done_at: string | null;
+  /** 用户的回复内容：回复即完成，AI 通过 MCP 取回后继续工作 */
+  reply_text: string | null;
+  replied_at: string | null;
 }
 
 export interface TaskSource {

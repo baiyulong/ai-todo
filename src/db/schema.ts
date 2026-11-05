@@ -150,6 +150,11 @@ create table if not exists api_tokens (
   revoked_at   timestamptz
 );
 
+-- 任务回复：用户在网页上回复任务后任务标记完成，
+-- AI 侧通过 MCP todo_wait_reply / todo_get_reply 取回回复内容继续工作
+alter table tasks add column if not exists reply_text text;
+alter table tasks add column if not exists replied_at timestamptz;
+
 -- 管理界面要支持随时复制令牌明文，所以明文直接落库（自托管场景可接受）。
 -- 老令牌只有哈希、无法回填明文，这些行的 token 为空，界面上仅显示掩码。
 alter table api_tokens add column if not exists token text;

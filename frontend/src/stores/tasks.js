@@ -137,6 +137,18 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
+  /** 回复任务：写入答复并标记完成——正在等待的 AI 会立刻收到这条回复 */
+  async function replyTask(id, text) {
+    try {
+      await api.post(`/api/v1/tasks/${id}/reply`, { reply: text });
+      ui.toast(t('task.repliedToast'));
+      await loadTasks();
+      await session.loadMe();
+    } catch (err) {
+      ui.toast(translateError(err), true);
+    }
+  }
+
   async function addTask(payload) {
     await api.post('/api/v1/tasks', payload);
     await loadTasks();
@@ -161,6 +173,7 @@ export const useTasksStore = defineStore('tasks', () => {
     transferTask,
     snoozeTask,
     clearArchived,
+    replyTask,
     addTask,
   };
 });

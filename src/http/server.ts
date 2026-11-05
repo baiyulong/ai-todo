@@ -1075,6 +1075,53 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   app.post<{ Params: { id: string } }>('/api/v1/tasks/:id/done', { preHandler: authHooks }, statusRoute('done'));
   app.post<{ Params: { id: string } }>('/api/v1/tasks/:id/archive', { preHandler: authHooks }, statusRoute('archived'));
 
+  // 用户回复任务：写入答复并把任务标记完成。
+  // AI 侧正在 /reply 长轮询里挂着，这个写入会立刻被它取走。
+  app.post<{ Params: { id: string } }>('/api/v1/tasks/:id/reply', { preHandler: authHooks }, async (req, reply) => {
+    const ctx = currentAuth(req);
+    const body = z
+      .object({ reply: z.string().min(1).max(8000) })
+      .safeParse(req.body ?? {});
+    if (!body.success) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'invalid_argument', message: '回复内容不能为空' } });
+    }
+    const task = await tasks.replyTask(ctx.userId, req.params.id, body.data.reply.trim());
+    if (!task) {
+      return reply.code(404).send({ error: { code: 'task_not_found', message: '任务不存在' } });
+    }
+    return { task };
+  });
+
+  /**
+   * 查询/等待任务回复。
+   *
+   * wait=秒数 时服务端挂起轮询（500ms 一次），用户一回复立刻返回——
+   * 这是 MCP todo_wait_reply 的底座。不传 wait 就是普通的即时查询。
+   * 状态变成 done / archived 都算「有了结论」，不再等。
+   */
+  app.get<{ Params: { id: string }; Querystring: { wait?: string } }>(
+    '/api/v1/tasks/:id/reply',
+    { preHandler: authHooks },
+    async (req, reply) => {
+      const ctx = currentAuth(req);
+      const waitSec = Math.min(Math.max(Number(req.query.wait ?? 0) || 0, 0), 30);
+      const deadline = Date.now() + waitSec * 1000;
+      const settled = (t: Task) => t.status === 'done' || t.status === 'archived';
+
+      let task = await tasks.getTask(ctx.userId, req.params.id);
+      while (task && !settled(task) && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 500));
+        task = await tasks.getTask(ctx.userId, req.params.id);
+      }
+      if (!task) {
+        return reply.code(404).send({ error: { code: 'task_not_found', message: '任务不存在' } });
+      }
+      return { task, replied: task.reply_text != null };
+    },
+  );
+
   /**
    * 清空已归档（批量彻底删除）。
    *

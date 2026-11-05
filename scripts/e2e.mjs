@@ -884,9 +884,9 @@ async function main() {
   const tools = await client.listTools();
   const toolNames = tools.tools.map((t) => t.name).sort();
   check(
-    'MCP 暴露 7 个工具',
+    'MCP 暴露 9 个工具',
     toolNames.join(',') ===
-      'todo_ack,todo_archive,todo_create,todo_done,todo_list,todo_snooze,todo_update',
+      'todo_ack,todo_archive,todo_create,todo_done,todo_get_reply,todo_list,todo_snooze,todo_update,todo_wait_reply',
     toolNames.join(','),
   );
 
@@ -917,6 +917,57 @@ async function main() {
   check('MCP todo_list 可用', !listRes.isError, listRes.content?.[0]?.text?.slice(0, 60));
 
   const mcpTaskId = call.structuredContent?.task_id;
+
+  /* 回复闭环：todo_wait_reply 长轮询挂起 → 用户（网页会话）回复 → 立刻拿到回复内容 */
+  const waitPromise = client
+    .callTool({ name: 'todo_wait_reply', arguments: { id: mcpTaskId, timeout: 20 } })
+    .catch((e) => e);
+  await new Promise((r) => setTimeout(r, 800));
+  const replyRes = await userApi(`/api/v1/tasks/${mcpTaskId}/reply`, {
+    method: 'POST',
+    cookie: userCookie,
+    body: JSON.stringify({ reply: '确认通过，继续吧' }),
+  });
+  check(
+    '用户可以回复任务（回复即完成）',
+    replyRes.res.status === 200 &&
+      replyRes.body.task.status === 'done' &&
+      replyRes.body.task.reply_text === '确认通过，继续吧',
+    `HTTP ${replyRes.res.status}`,
+  );
+
+  const waitRes = await waitPromise;
+  check(
+    'todo_wait_reply 长轮询拿到回复内容',
+    waitRes.structuredContent?.replied === true &&
+      waitRes.structuredContent?.reply === '确认通过，继续吧' &&
+      waitRes.structuredContent?.status === 'done',
+    JSON.stringify(waitRes.structuredContent ?? String(waitRes)),
+  );
+
+  const getReplyRes = await client.callTool({ name: 'todo_get_reply', arguments: { id: mcpTaskId } });
+  check(
+    'todo_get_reply 即时查询回复',
+    getReplyRes.structuredContent?.replied === true,
+    JSON.stringify(getReplyRes.structuredContent ?? getReplyRes.content?.[0]?.text),
+  );
+
+  /* 超时分支：新任务没人回复，短等待应返回 replied=false 且不报错 */
+  const timeoutTask = await client.callTool({
+    name: 'todo_create',
+    arguments: { title: `等待超时的任务 ${mcpStamp}`, project: 'e2e-mcp', notify: false },
+  });
+  const timeoutWait = await client.callTool({
+    name: 'todo_wait_reply',
+    arguments: { id: timeoutTask.structuredContent?.task_id, timeout: 2 },
+  });
+  check(
+    'todo_wait_reply 超时返回 replied=false',
+    timeoutWait.structuredContent?.replied === false &&
+      timeoutWait.structuredContent?.status === 'pending',
+    JSON.stringify(timeoutWait.structuredContent ?? timeoutWait.content?.[0]?.text),
+  );
+
   const ackRes = await client.callTool({ name: 'todo_ack', arguments: { id: mcpTaskId } });
   check('MCP todo_ack 可用', !ackRes.isError, ackRes.content?.[0]?.text);
 
@@ -1254,9 +1305,9 @@ async function main() {
   const httpTools = await httpClient.listTools();
   const httpToolNames = httpTools.tools.map((t) => t.name).sort();
   check(
-    '远程 MCP 暴露 7 个工具',
+    '远程 MCP 暴露 9 个工具',
     httpToolNames.join(',') ===
-      'todo_ack,todo_archive,todo_create,todo_done,todo_list,todo_snooze,todo_update',
+      'todo_ack,todo_archive,todo_create,todo_done,todo_get_reply,todo_list,todo_snooze,todo_update,todo_wait_reply',
     httpToolNames.join(','),
   );
   check(

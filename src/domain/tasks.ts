@@ -361,6 +361,30 @@ export class TaskService {
     return task;
   }
 
+  /**
+   * 用户回复任务：写入回复内容并标记完成。
+   * 回复即完成——正在 todo_wait_reply 长轮询里的 AI 会立刻拿到这条回复。
+   * 已完成的任务再次回复 = 补充/修改答复，直接覆盖。
+   */
+  async replyTask(userId: string, id: string, replyText: string): Promise<Task | null> {
+    const res = await this.db.query<Task>(
+      `update tasks
+       set status = 'done'::task_status,
+           done_at = coalesce(done_at, now()),
+           reply_text = $3,
+           replied_at = now(),
+           updated_at = now()
+       where user_id = $1 and id = $2
+       returning *`,
+      [userId, id, replyText],
+    );
+    const task = res.rows[0] ?? null;
+    if (task) {
+      await this.recordEvent(userId, task.id, 'task.replied', { severity: task.severity });
+    }
+    return task;
+  }
+
   async snooze(userId: string, id: string, until: string): Promise<Task | null> {
     const res = await this.db.query<Task>(
       `update tasks

@@ -100,6 +100,18 @@ async function doTransfer() {
   await tasks.transferTask(props.task.id, transferTo.value);
   transferTo.value = '';
 }
+
+/* ---------------- 回复 ---------------- */
+
+/* 回复即完成：AI 侧可能正挂起等待这条回复 */
+const replyText = ref('');
+
+async function doReply() {
+  const text = replyText.value.trim();
+  if (!text) return;
+  await tasks.replyTask(props.task.id, text);
+  replyText.value = '';
+}
 </script>
 
 <template>
@@ -180,6 +192,12 @@ async function doTransfer() {
     <template v-if="expanded">
       <p v-if="task.detail" class="task-detail">{{ task.detail }}</p>
 
+      <!-- 已有回复：气泡展示（回复过任务 = 已完成并答复了 AI） -->
+      <div v-if="task.reply_text" class="task-reply">
+        <div class="task-reply-head">{{ t('task.replyLabel') }} · {{ formatTime(task.replied_at) }}</div>
+        <div class="task-reply-body">{{ task.reply_text }}</div>
+      </div>
+
       <div class="task-actions">
         <button v-if="task.status === 'pending'" class="btn" type="button" @click.stop="tasks.setStatus(task.id, 'ack')">
           {{ t('action.ack') }}
@@ -212,6 +230,22 @@ async function doTransfer() {
           type="button"
           @click.stop="snooze(kind)"
         >{{ label }}</button>
+      </div>
+
+      <!-- 回复输入：任务还没完成时可以回复；回复后任务标记完成，等待中的 AI 会立刻收到 -->
+      <div v-if="task.status === 'pending' || task.status === 'acked'" class="task-reply-row">
+        <input
+          v-model="replyText"
+          class="input"
+          type="text"
+          maxlength="8000"
+          :placeholder="t('task.replyPlaceholder')"
+          :aria-label="t('task.replyLabel')"
+          @keydown.enter.prevent="doReply"
+        >
+        <button class="btn btn-primary" type="button" :disabled="!replyText.trim()" @click="doReply">
+          {{ t('task.reply') }}
+        </button>
       </div>
     </template>
   </article>

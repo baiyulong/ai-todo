@@ -389,6 +389,22 @@ button.src-chip:hover { border-color: var(--accent); color: var(--accent); }
 .task-transfer { display: inline-flex; gap: 6px; }
 .task-transfer .select { width: auto; min-width: 150px; }
 
+/* 回复气泡：用户答复的内容，AI 侧通过 MCP 取回的就是这段文字 */
+.task-reply {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.task-reply-head { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.task-reply-body { font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+
+/* 回复输入行：任务未完成时展开区底部 */
+.task-reply-row { display: flex; gap: 8px; margin-top: 10px; }
+.task-reply-row .input { flex: 1; min-width: 0; }
+.task-reply-row .btn { flex: none; }
+
 .snooze-row { margin-top: 8px; }
 
 /* ---------------------------------------------------------- 抽屉 */
