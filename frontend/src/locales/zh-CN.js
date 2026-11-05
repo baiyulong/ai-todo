@@ -227,6 +227,9 @@ export const dict = {
   'token.copiedToast': '已复制',
   'token.copyFailedToast': '复制失败，请手动选中复制',
 
+  // ---------------- 主题动效 ----------------
+  'fx.paperCornerHint': '点一下，起一阵风',
+
   // ---------------- MCP ----------------
   'mcp.hint': '把下面这段加到你的 AI 客户端（MCode / Claude Code / Cursor / Trae）的 MCP 配置里，AI 就能把完成的任务推进来。',
   'mcp.tokenPlaceholder': '<在「令牌管理」里签发一枚令牌后填这里>',

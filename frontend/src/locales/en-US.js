@@ -227,6 +227,9 @@ export const dict = {
   'token.copiedToast': 'Copied',
   'token.copyFailedToast': 'Copy failed — select it and copy manually',
 
+  // ---------------- Theme FX ----------------
+  'fx.paperCornerHint': 'Click for a gust of wind',
+
   // ---------------- MCP ----------------
   'mcp.hint': 'Paste this into your AI client’s MCP configuration (MCode / Claude Code / Cursor / Trae) and the AI can push finished tasks to you.',
   'mcp.tokenPlaceholder': '<issue a token under “Tokens” and paste it here>',

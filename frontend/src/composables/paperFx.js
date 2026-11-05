@@ -1,10 +1,14 @@
-/* 工程纸主题专属动态效果：秋风卷落叶。
- * 每隔一阵，风从左侧吹过——弧形风线掠过屏幕中段、几片秋叶翻滚着飘过，
- * 左下角的「纸角」被风掀起卷动一下再落回。
- * 纯装饰、不挡交互、低频率；尊重系统的 prefers-reduced-motion。 */
+/* 工程纸主题专属动态效果：秋风卷落叶（点击触发）。
+ * 左下角常驻一枚「纸角」，点它一下起一阵风——
+ * 纸角被掀起卷动一下再落回，弧形风线掠过屏幕中段、几片秋叶翻滚着飘过。
+ * 不再自动吹风；纯装饰、不挡交互；尊重系统的 prefers-reduced-motion。 */
+
+import { t } from '../i18n.js';
 
 let layer = null;
 let timers = [];
+let corner = null;
+let lifting = false;
 
 export function paperFxEnabled() {
   return typeof matchMedia === 'function' && !matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -49,16 +53,29 @@ function spawnLeaf() {
 
 /* 纸角：左下角被风掀起、抖两下、再落回 */
 function liftCorner() {
-  if (!layer) return;
-  const corner = document.createElement('span');
-  corner.className = 'paper-corner';
-  corner.addEventListener('animationend', () => corner.remove());
-  layer.appendChild(corner);
+  if (!corner) return;
+  lifting = true;
+  corner.classList.add('is-lifting');
+  corner.addEventListener(
+    'animationend',
+    () => {
+      corner?.classList.remove('is-lifting');
+      lifting = false;
+    },
+    { once: true },
+  );
+  // 兜底：万一 animationend 没触发（切主题/隐藏页面等），3.2s 后复位
+  later(() => {
+    if (lifting) {
+      corner?.classList.remove('is-lifting');
+      lifting = false;
+    }
+  }, 3200);
 }
 
 /* 一阵风：纸角先起，风线与落叶随后错峰掠过 */
 function gust() {
-  if (!layer) return;
+  if (!layer || lifting) return;
   liftCorner();
   const lines = 2 + Math.floor(Math.random() * 3);
   for (let i = 0; i < lines; i++) later(spawnWindLine, 200 + i * (250 + Math.random() * 350));
@@ -71,25 +88,21 @@ export function startPaperFx() {
   if (!paperFxEnabled()) return;
   layer = document.createElement('div');
   layer.className = 'paper-fx-layer';
+  corner = document.createElement('span');
+  corner.className = 'paper-corner';
+  corner.title = t('fx.paperCornerHint');
+  corner.addEventListener('click', gust);
+  layer.appendChild(corner);
   document.body.appendChild(layer);
-  // 进主题稍等片刻迎来第一阵风，之后每 9~15 秒一阵
-  later(gust, 2500);
-  const schedule = (delay) => {
-    timers.push(
-      setTimeout(() => {
-        gust();
-        schedule(9000 + Math.random() * 6000);
-      }, delay),
-    );
-  };
-  schedule(11500);
 }
 
 export function stopPaperFx() {
-  for (const t of timers) clearTimeout(t);
+  for (const id of timers) clearTimeout(id);
   timers = [];
   if (layer) {
     layer.remove();
     layer = null;
   }
+  corner = null;
+  lifting = false;
 }
