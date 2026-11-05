@@ -129,6 +129,12 @@ export async function refreshNotifyPermission() {
     ui.setNotifyPerm('unsupported');
     return;
   }
+  // 非 HTTPS / 非 localhost：浏览器会把网页通知强制判为 denied，
+  // 无论用户在站点权限里怎么设置。单独立一个状态，界面上给出真话和出路。
+  if (!window.isSecureContext) {
+    ui.setNotifyPerm('insecure');
+    return;
+  }
   try {
     const st = await navigator.permissions.query({ name: 'notifications' });
     ui.setNotifyPerm(st.state);

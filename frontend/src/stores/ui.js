@@ -101,7 +101,7 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   /* ---------------- 通知权限（Permissions API 的实时值） ---------------- */
-  const notifyPerm = ref('Notification' in window ? Notification.permission : 'unsupported');
+  const notifyPerm = ref('Notification' in window ? (window.isSecureContext ? Notification.permission : 'insecure') : 'unsupported');
   // 用户点过「稍后再说」就不再打扰；权限变化或重新授权后重置
   const notifyBannerDismissed = ref(false);
 

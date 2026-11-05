@@ -22,11 +22,12 @@ const permLabel = computed(() => {
     denied: 'perm.denied',
     default: 'perm.default',
     unsupported: 'perm.unsupported',
+    insecure: 'perm.insecure',
   };
   const p = ui.notifyPerm;
   return map[p] ? t(map[p]) : p;
 });
-const permClass = computed(() => ({ granted: 'ok', denied: 'bad', default: 'warn', unsupported: 'bad' }[ui.notifyPerm] || ''));
+const permClass = computed(() => ({ granted: 'ok', denied: 'bad', default: 'warn', unsupported: 'bad', insecure: 'bad' }[ui.notifyPerm] || ''));
 
 const liveText = computed(() => {
   if (ui.live === 'live') return t('topbar.live');

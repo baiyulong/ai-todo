@@ -14,6 +14,7 @@ const notifyBanner = computed(() => {
   if (ui.notifyPerm === 'granted') return null;
   if (ui.notifyBannerDismissed) return null;
   if (ui.notifyPerm === 'unsupported') return { kind: 'unsupported', enableBtn: false };
+  if (ui.notifyPerm === 'insecure') return { kind: 'insecure', enableBtn: false };
   if (ui.notifyPerm === 'denied') return { kind: 'denied', enableBtn: false };
   return { kind: 'default', enableBtn: true };
 });
@@ -22,6 +23,7 @@ const notifyText = computed(() => {
   const b = notifyBanner.value;
   if (!b) return '';
   if (b.kind === 'unsupported') return t('banner.unsupported');
+  if (b.kind === 'insecure') return t('banner.insecure');
   if (b.kind === 'denied') return t('banner.denied');
   return t('banner.enable');
 });

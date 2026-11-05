@@ -47,6 +47,7 @@ export const dict = {
   'banner.enableBtn': 'Turn on',
   'banner.unsupported': 'This browser does not support system notifications. In-page hints will be used instead.',
   'banner.denied': 'Notification permission was denied. Allow notifications in the site settings to the left of the address bar, then reload.',
+  'banner.insecure': 'You are visiting over HTTP, so the browser has disabled web notifications. Open http://localhost:8787 on this machine to enable them; other LAN devices need HTTPS. In-page alerts and sounds still work.',
   'banner.close': 'Close',
 
   // ---------------- Toolbar ----------------
@@ -178,6 +179,7 @@ export const dict = {
 
   'perm.granted': 'Allowed',
   'perm.denied': 'Denied',
+  'perm.insecure': 'Unavailable (HTTP)',
   'perm.default': 'Not set',
   'perm.unsupported': 'Unsupported',
 

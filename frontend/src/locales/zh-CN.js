@@ -47,6 +47,7 @@ export const dict = {
   'banner.enableBtn': '开启通知',
   'banner.unsupported': '当前浏览器不支持系统通知，将以页内提示代替。',
   'banner.denied': '通知权限已被拒绝。请在地址栏左侧的网站设置里允许通知，然后刷新页面。',
+  'banner.insecure': '当前通过 HTTP 地址访问，浏览器已强制禁用网页通知。在本机改用 http://localhost:8787 访问即可开启；局域网其他设备需配置 HTTPS。页面内提示与声音不受影响。',
   'banner.close': '关闭',
 
   // ---------------- 工具栏 ----------------
@@ -178,6 +179,7 @@ export const dict = {
 
   'perm.granted': '已允许',
   'perm.denied': '已拒绝',
+  'perm.insecure': '不可用（HTTP 访问）',
   'perm.default': '未设置',
   'perm.unsupported': '不支持',
 
