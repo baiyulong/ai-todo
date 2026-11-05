@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Todo · CloudBase 站点</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --line:#e5e7eb; --text:#1f2328; --muted:#6b7280; --brand:#2563eb; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width:720px; margin:0 auto; padding:48px 20px; }
+  h1 { font-size:24px; margin:0 0 6px; display:flex; align-items:center; gap:10px; }
+  .sub { color:var(--muted); font-size:14px; margin:0 0 32px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .card h2 { font-size:16px; margin:0 0 8px; }
+  .card p { font-size:13px; color:var(--muted); line-height:1.7; margin:0 0 12px; }
+  a.btn { display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
+          padding:9px 18px; border-radius:8px; font-size:14px; }
+  a.btn.ghost { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+  code { background:#f3f4f6; padding:1px 6px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    AI Todo · CloudBase 站点
+  </h1>
+  <p class="sub">静态托管域名 · <code>sure-vole-d0gfdy5aj5daeaa3b</code>（上海）</p>
+
+  <div class="card">
+    <h2>☁️ 云端备份面板（这里可用）</h2>
+    <p>匿名登录 CloudBase，直接查看云端数据库 <code>cloud_todos</code> 里的任务备份，支持 JSON 下载与导入。</p>
+    <a class="btn" href="/cloud.html">打开云端备份面板</a>
+  </div>
+
+  <div class="card">
+    <h2>🖥️ 主应用（请在本地运行）</h2>
+    <p>
+      AI Todo 主应用是本地服务架构：任务存在本机数据库，配合桌面通知与 MCP（AI 推送任务）使用，
+      接口由本机的 <code>npm start</code> 提供，因此在这个静态托管域名上没有后端可连。
+      本地打开：<code>http://localhost:8787</code>。
+    </p>
+    <a class="btn ghost" href="http://localhost:8787">打开本地主应用</a>
+  </div>
+
+  <div class="card">
+    <h2>🔄 数据同步</h2>
+    <p>本地 ↔ 云端的任务备份走 CLI：<code>npm run cloud push</code>（备份）/ <code>npm run cloud pull</code>（恢复）/ <code>npm run cloud status</code>（状态）。</p>
+  </div>
+</div>
+</body>
+</html>

@@ -18,10 +18,13 @@
     "user": "node dist/src/cli.js user",
     "token": "node dist/src/cli.js token",
     "migrate": "node dist/src/cli.js migrate",
+    "cloud": "node dist/src/cli.js cloud",
     "test": "npm run build && node --test dist/test/*.test.js",
-    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\""
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "deploy:web": "tcb hosting deploy web/ -e sure-vole-d0gfdy5aj5daeaa3b --verify --ignore index.html"
   },
   "dependencies": {
+    "@cloudbase/js-sdk": "^3.11.0",
     "@electric-sql/pglite": "^0.3.14",
     "@fastify/cookie": "^11.0.2",
     "@fastify/static": "^8.2.0",

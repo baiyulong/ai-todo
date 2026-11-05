@@ -1,0 +1,9 @@
+# CloudBase 云托管云端构建忽略清单（上传源码时排除）
+node_modules
+dist
+data
+docs
+*.log
+.git
+.env
+admin-credentials.txt

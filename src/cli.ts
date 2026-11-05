@@ -12,6 +12,14 @@ import { NotificationBus } from './notify/bus.js';
 import { NotificationOrchestrator } from './notify/orchestrator.js';
 import { NotificationScheduler } from './notify/scheduler.js';
 import { defaultSessionKey, runStdioServer } from './mcp/server.js';
+import {
+  cloudCount,
+  cloudLastSyncedAt,
+  cloudPushTasks,
+  pullIntoLocalDb,
+  resolveEnvId,
+  type LocalTaskRow,
+} from './cloud/cloudbase.js';
 
 const USAGE = `AI Todo
 
@@ -21,12 +29,16 @@ const USAGE = `AI Todo
   ai-todo user       用户管理：add / list / passwd / enable / disable / token
   ai-todo token      签发一个新的访问令牌
   ai-todo migrate    仅执行数据库迁移
+  ai-todo cloud      CloudBase 云端同步：push / pull / status
 
 示例：
   ai-todo user add alice              建号并打印初始密码与访问令牌
   ai-todo user list                   列出所有账号
   ai-todo user disable alice          禁用账号（同时吊销其令牌与会话）
   ai-todo user token alice --name=claude  为 alice 签发一枚 MCP 用的令牌
+  ai-todo cloud push                  把本地全部任务备份到 CloudBase PostgreSQL
+  ai-todo cloud pull                  从云端恢复本地缺失的任务（不触发通知）
+  ai-todo cloud status                查看云端环境与本/云两侧的任务数
 `;
 
 /* ---------------------------------------------------------------- 小工具 */
@@ -407,6 +419,86 @@ async function mintToken(): Promise<void> {
   printMcpConfig(base, payload.token);
 }
 
+/* ---------------------------------------------------------------- cloud */
+
+async function cloudCommand(): Promise<void> {
+  const sub = (process.argv[3] ?? 'status').toLowerCase();
+  const envId = resolveEnvId();
+  if (!envId) {
+    console.error(
+      '找不到 CloudBase 环境 ID。请先 tcb login && tcb env use <envId>，或设置环境变量 CLOUDBASE_ENV_ID。',
+    );
+    process.exit(1);
+  }
+
+  if (sub === 'push' || sub === 'pull') {
+    const config = loadConfig();
+    const db = await openDb(config);
+    try {
+      if (sub === 'push') {
+        const res = await db.query<LocalTaskRow>(
+          `SELECT id, user_id, title, detail, status, severity, project, links, due_at, created_at, updated_at FROM tasks`,
+        );
+        console.log(`本地任务 ${res.rows.length} 条，开始推送到云端 ${envId} ...`);
+        const pushed = await cloudPushTasks(res.rows);
+        const total = await cloudCount();
+        console.log('');
+        console.log(`  ✔ 已同步 ${pushed} 条，云端现共 ${total} 条（表 ${'cloud_todos'}）`);
+        console.log('');
+      } else {
+        console.log(`从云端 ${envId} 拉取任务 ...`);
+        const result = await pullIntoLocalDb(db);
+        console.log('');
+        console.log('  恢复完成');
+        console.log('  ─────────────────────────────────────────');
+        console.log(`  云端任务总数        ${result.cloudTotal}`);
+        console.log(`  新恢复到本地        ${result.inserted}`);
+        console.log(`  本地已存在（跳过）  ${result.skippedExisting}`);
+        if (result.skippedUnknownUser > 0) {
+          console.log(`  用户不存在（跳过）  ${result.skippedUnknownUser}`);
+        }
+        console.log('');
+        console.log('  说明：恢复的任务不会触发通知。');
+        console.log('');
+      }
+    } finally {
+      await db.close();
+    }
+    return;
+  }
+
+  if (sub === 'status') {
+    console.log('');
+    console.log('  CloudBase 云端同步状态');
+    console.log('  ─────────────────────────────────────────');
+    console.log(`  环境     ${envId}`);
+    try {
+      const [total, lastSync] = await Promise.all([cloudCount(), cloudLastSyncedAt()]);
+      const config = loadConfig();
+      const db = await openDb(config);
+      let localCount = '?';
+      try {
+        const res = await db.query<{ n: string }>(`SELECT count(*)::text AS n FROM tasks`);
+        localCount = res.rows[0]?.n ?? '0';
+      } finally {
+        await db.close();
+      }
+      console.log(`  本地任务 ${localCount}`);
+      console.log(`  云端任务 ${total}`);
+      console.log(`  最近同步 ${lastSync ?? '从未'}`);
+    } catch (err) {
+      console.log(`  云端状态获取失败：${err instanceof Error ? err.message : err}`);
+      console.log('  提示：凭证过期时重新运行 tcb login 即可。');
+    }
+    console.log('');
+    return;
+  }
+
+  console.error(`未知子命令：cloud ${sub}（可用：push / pull / status）`);
+  console.log(USAGE);
+  process.exit(1);
+}
+
 /* ---------------------------------------------------------------- main */
 
 async function main(): Promise<void> {
@@ -422,6 +514,8 @@ async function main(): Promise<void> {
       return mintToken();
     case 'migrate':
       return migrateOnly();
+    case 'cloud':
+      return cloudCommand();
     case 'help':
     case '--help':
     case '-h':
