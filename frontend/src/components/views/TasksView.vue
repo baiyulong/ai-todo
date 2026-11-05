@@ -1,10 +1,11 @@
 <script setup>
 /* 任务视图：状态标签页 + 筛选工具栏 + 任务列表 + 空态 */
 
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useUiStore } from '../../stores/ui.js';
 import { useSessionStore } from '../../stores/session.js';
 import { useTasksStore } from '../../stores/tasks.js';
+import { api } from '../../api.js';
 import { t } from '../../i18n.js';
 import TaskCard from '../tasks/TaskCard.vue';
 
@@ -22,6 +23,15 @@ const agentOptions = computed(() => {
 });
 
 const archivedCount = computed(() => session.me?.archived ?? 0);
+
+/* 项目筛选：选项来自项目列表（任务都挂在项目下） */
+const projectOptions = ref([]);
+onMounted(async () => {
+  try {
+    const res = await api.get('/api/v1/projects');
+    projectOptions.value = res.projects || [];
+  } catch { /* 筛选项拉不到不影响列表 */ }
+});
 
 let searchTimer = null;
 function onSearchInput(e) {
@@ -85,6 +95,11 @@ watch(agentOptions, (agents) => {
         <option value="blocker">{{ t('severity.blocker') }}</option>
         <option value="need_human">{{ t('severity.need_human') }}</option>
         <option value="info">{{ t('severity.info') }}</option>
+      </select>
+      <!-- 项目筛选：任务都挂在项目下，按项目名过滤 -->
+      <select v-model="tasks.project" class="select" :aria-label="t('toolbar.filterProject')" @change="tasks.loadTasks()">
+        <option value="">{{ t('toolbar.allProjects') }}</option>
+        <option v-for="p in projectOptions" :key="p.id" :value="p.name">{{ p.name }}</option>
       </select>
       <!-- 来源筛选：选项来自 /api/v1/me 的 sources（哪些 AI 工具推过任务） -->
       <select v-model="tasks.source" class="select" :aria-label="t('toolbar.filterSource')" @change="tasks.loadTasks()">

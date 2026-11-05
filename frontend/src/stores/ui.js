@@ -62,7 +62,7 @@ export const useUiStore = defineStore('ui', () => {
     drawerMode.value = null;
   }
 
-  /* ---------------- 主区视图：tasks / users / tokens ---------------- */
+  /* ---------------- 主区视图：tasks / users / tokens / projects ---------------- */
   const view = ref('tasks');
 
   function setView(v) {

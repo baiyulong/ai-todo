@@ -61,6 +61,8 @@ export const dict = {
   'toolbar.filterSeverity': 'Filter by level',
   'toolbar.allSources': 'All sources',
   'toolbar.filterSource': 'Filter by source',
+  'toolbar.allProjects': 'All projects',
+  'toolbar.filterProject': 'Filter by project',
   'toolbar.searchPlaceholder': 'Search…',
   'toolbar.searchLabel': 'Search tasks',
 
@@ -125,7 +127,6 @@ export const dict = {
   'taskDialog.detailPlaceholder': 'Add any context',
   'taskDialog.fieldSeverity': 'Level',
   'taskDialog.fieldProject': 'Project',
-  'taskDialog.projectPlaceholder': 'Optional',
   'taskDialog.notify': 'Notify me right away',
   'taskDialog.cancel': 'Cancel',
   'taskDialog.submit': 'Add',
@@ -211,7 +212,7 @@ export const dict = {
   'password.mismatch': 'The two new passwords do not match',
 
   // ---------------- Access tokens ----------------
-  'token.hint': 'To push tasks over MCP, your AI client needs an access token of your own. The credential must live in the client’s AI_TODO_TOKEN environment variable — you can copy any token from the list below at any time.',
+  'token.hint': 'To push tasks over MCP, your AI client needs an access token of your own. The credential must live in the client’s AI_TODO_TOKEN environment variable — you can copy any token from the list below at any time. A token is bound to a project when issued; every task it pushes lands in that project.',
   'token.loadFailed': 'Could not load tokens: {message}',
   'token.empty': 'No tokens issued yet.',
   'token.lastUsed': 'Last used {time}',
@@ -221,11 +222,27 @@ export const dict = {
   'token.delete': 'Delete',
   'token.deletedToast': 'Token deleted',
   'token.namePlaceholder': 'Token name, e.g. claude-code',
+  'token.fieldProject': 'Bound project (pushed tasks land here)',
   'token.issue': 'Issue new token',
   'token.issuedToast': 'Token issued — copy it now',
   'token.copy': 'Copy',
   'token.copiedToast': 'Copied',
   'token.copyFailedToast': 'Copy failed — select it and copy manually',
+
+  // ---------------- Projects ----------------
+  'topbar.projects': 'Projects',
+  'page.projectsTitle': 'Projects',
+  'project.hint': 'Every task belongs to a project: create projects first, bind one when issuing a token, and tasks pushed by that token land in it automatically. Each account has a default project that cannot be deleted.',
+  'project.empty': 'No projects yet.',
+  'project.namePlaceholder': 'Project name',
+  'project.create': 'Create project',
+  'project.defaultBadge': 'Default',
+  'project.taskCount': '{count} tasks',
+  'project.delete': 'Delete',
+  'project.deleteTitle': 'Delete project “{name}”?',
+  'project.deleteText': 'Its {count} tasks and any tokens bound to it will move to the default project.',
+  'project.createdToast': 'Project created',
+  'project.deletedToast': 'Project deleted',
 
   // ---------------- Theme FX ----------------
   'fx.paperCornerHint': 'Click for a gust of wind',
@@ -329,6 +346,10 @@ export const dict = {
   'error.task_not_found': 'Task not found',
   'error.task_not_archived': 'Archive the task first — only archived tasks can be deleted permanently',
   'error.token_not_found': 'Token not found',
+  'error.project_not_found': 'Project not found',
+  'error.project_name_taken': 'A project with this name already exists',
+  'error.project_default_undeletable': 'The default project cannot be deleted',
+  'error.project_name_invalid': 'Project name must be 1-120 characters',
   'error.user_not_found': 'User not found',
 
   // ---------------- WeChat sign-in ----------------

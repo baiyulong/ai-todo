@@ -15,6 +15,7 @@ export const useTasksStore = defineStore('tasks', () => {
   const status = ref('pending');
   const severity = ref('');
   const source = ref('');
+  const project = ref('');
   const q = ref('');
   /** 展开（选中）的任务 id；null 表示全部收起 */
   const selectedId = ref(null);
@@ -24,6 +25,7 @@ export const useTasksStore = defineStore('tasks', () => {
     if (status.value !== 'all') params.set('status', status.value);
     if (severity.value) params.set('severity', severity.value);
     if (source.value) params.set('source', source.value);
+    if (project.value) params.set('project', project.value);
     if (q.value) params.set('q', q.value);
     params.set('limit', '200');
     try {
@@ -147,6 +149,7 @@ export const useTasksStore = defineStore('tasks', () => {
     status,
     severity,
     source,
+    project,
     q,
     selectedId,
     loadTasks,

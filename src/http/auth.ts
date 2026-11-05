@@ -6,6 +6,8 @@ export interface AuthContext {
   userId: string;
   scopes: string[];
   via: 'pat' | 'session';
+  /** PAT 绑定的项目：通过令牌推送的任务一律落进这个项目；会话鉴权时为 null */
+  projectId: string | null;
 }
 
 export function hashToken(token: string): string {
@@ -26,6 +28,7 @@ interface TokenRow {
   name: string;
   scopes: string[];
   revoked_at: string | null;
+  project_id: string | null;
 }
 
 interface SessionRow {
@@ -44,7 +47,7 @@ interface SessionRow {
  */
 export async function resolvePatToken(db: Db, token: string): Promise<AuthContext | null> {
   const res = await db.query<TokenRow>(
-    `select t.id, t.user_id, t.name, t.scopes, t.revoked_at
+    `select t.id, t.user_id, t.name, t.scopes, t.revoked_at, t.project_id
      from api_tokens t join users u on u.id = t.user_id
      where t.token_hash = $1`,
     [hashToken(token)],
@@ -52,7 +55,7 @@ export async function resolvePatToken(db: Db, token: string): Promise<AuthContex
   const row = res.rows[0];
   if (!row || row.revoked_at) return null;
   await db.query(`update api_tokens set last_used_at = now() where id = $1`, [row.id]);
-  return { userId: row.user_id, scopes: row.scopes, via: 'pat' };
+  return { userId: row.user_id, scopes: row.scopes, via: 'pat', projectId: row.project_id };
 }
 
 /**
@@ -78,7 +81,7 @@ export function createAuthenticator(db: Db, cookieName: string) {
     await db.query(`update sessions set last_seen_at = now() where id = $1`, [row.id]);
     const scopes = ['tasks:read', 'tasks:write'];
     if (row.is_admin) scopes.push('admin');
-    return { userId: row.user_id, scopes, via: 'session' };
+    return { userId: row.user_id, scopes, via: 'session', projectId: null };
   };
 
   return async function authenticate(

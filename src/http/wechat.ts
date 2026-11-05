@@ -29,6 +29,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import type { UserService } from '../domain/users.js';
+import { ensureDefaultProject } from '../domain/projects.js';
 import { WechatError, type WechatClient, type WechatProfile } from '../domain/wechat.js';
 import { createSession, generateToken, hashToken, type AuthContext } from './auth.js';
 
@@ -588,12 +589,14 @@ async function completeWechatAuth(
   return { userId: user.id, purpose: 'login' };
 }
 
-/** 签发一枚访问令牌（PAT），返回明文 */
+/** 签发一枚访问令牌（PAT），返回明文；令牌挂在用户的默认项目下 */
 async function issuePat(db: Db, userId: string, name: string): Promise<string> {
   const token = generateToken('ait');
+  const project = await ensureDefaultProject(db, userId);
   await db.query(
-    `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
-    [userId, name, token, hashToken(token), ['tasks:read', 'tasks:write']],
+    `insert into api_tokens (user_id, name, token, token_hash, scopes, project_id)
+     values ($1,$2,$3,$4,$5,$6)`,
+    [userId, name, token, hashToken(token), ['tasks:read', 'tasks:write'], project.id],
   );
   return token;
 }

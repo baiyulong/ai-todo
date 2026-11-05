@@ -8,6 +8,14 @@ import { z } from 'zod';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import { TaskService } from '../domain/tasks.js';
+import {
+  ProjectError,
+  createProject,
+  deleteProject,
+  ensureDefaultProject,
+  getProject,
+  listProjects,
+} from '../domain/projects.js';
 import type { GroupBy, Task, TaskSeverity, TaskStatus } from '../domain/types.js';
 import { UserService, isValidUsername } from '../domain/users.js';
 import { generatePassword } from '../domain/passwords.js';
@@ -70,6 +78,9 @@ const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   detail: z.string().max(8000).optional(),
   severity: z.enum(['info', 'need_human', 'blocker']).optional(),
+  /** 项目 id：会话鉴权时用；令牌鉴权一律忽略，落进令牌绑定的项目 */
+  project_id: z.string().uuid().optional(),
+  /** 兼容旧客户端：按名字自动创建/匹配项目 */
   project: z.string().max(120).optional(),
   links: z.array(linkSchema).max(20).optional(),
   idempotency_key: z.string().max(300).optional(),
@@ -88,6 +99,7 @@ const updateTaskSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   detail: z.string().max(8000).nullable().optional(),
   severity: z.enum(['info', 'need_human', 'blocker']).optional(),
+  project_id: z.string().uuid().nullable().optional(),
   project: z.string().max(120).nullable().optional(),
   links: z.array(linkSchema).max(20).optional(),
   notify: z.boolean().optional(),
@@ -441,6 +453,52 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     });
   }
 
+  // ---------------------------------------------------------------- 项目
+
+  // 列出项目（含未归档任务数）；顺手补种默认项目
+  app.get('/api/v1/projects', { preHandler: authHooks }, async (req) => {
+    const ctx = currentAuth(req);
+    await ensureDefaultProject(db, ctx.userId);
+    return { projects: await listProjects(db, ctx.userId) };
+  });
+
+  app.post('/api/v1/projects', { preHandler: authHooks }, async (req, reply) => {
+    const ctx = currentAuth(req);
+    const body = z
+      .object({ name: z.string().min(1).max(120) })
+      .safeParse(req.body ?? {});
+    if (!body.success) {
+      return reply.code(400).send({ error: { code: 'invalid_argument', message: '项目名需为 1~120 个字符' } });
+    }
+    try {
+      const project = await createProject(db, ctx.userId, body.data.name);
+      return reply.code(201).send({ project });
+    } catch (err) {
+      if (err instanceof ProjectError) {
+        return reply.code(err.code === 'name_taken' ? 409 : 400).send({
+          error: { code: `project_${err.code}`, message: err.message },
+        });
+      }
+      throw err;
+    }
+  });
+
+  // 删除项目：项目下的任务与令牌自动挪进默认项目；默认项目不可删
+  app.delete<{ Params: { id: string } }>('/api/v1/projects/:id', { preHandler: authHooks }, async (req, reply) => {
+    const ctx = currentAuth(req);
+    try {
+      await deleteProject(db, ctx.userId, req.params.id);
+      return { ok: true };
+    } catch (err) {
+      if (err instanceof ProjectError) {
+        return reply.code(err.code === 'not_found' ? 404 : err.code === 'default_undeletable' ? 409 : 400).send({
+          error: { code: `project_${err.code}`, message: err.message },
+        });
+      }
+      throw err;
+    }
+  });
+
   // ---------------------------------------------------------------- 访问令牌
 
   // 列出令牌（明文一并返回，方便随时复制；老令牌只有掩码）
@@ -454,25 +512,35 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       created_at: string;
       last_used_at: string | null;
       revoked_at: string | null;
+      project_id: string | null;
+      project_name: string | null;
     }>(
-      `select id, name, token, left(token_hash, 8) as prefix, created_at, last_used_at, revoked_at
-       from api_tokens where user_id = $1 order by created_at asc`,
+      `select t.id, t.name, t.token, left(t.token_hash, 8) as prefix,
+              t.created_at, t.last_used_at, t.revoked_at,
+              t.project_id, p.name as project_name
+       from api_tokens t
+       left join projects p on p.id = t.project_id
+       where t.user_id = $1
+       order by t.created_at asc`,
       [ctx.userId],
     );
     return { tokens: res.rows };
   });
 
-  // 签发令牌：默认签给自己；管理员可传 user_id 替别人签
+  // 签发令牌：默认签给自己；管理员可传 user_id 替别人签。
+  // 令牌必须绑定项目（不传就落默认项目）：通过令牌推送的任务都进这个项目。
   app.post('/api/v1/tokens', { preHandler: authHooks }, async (req, reply) => {
     const ctx = currentAuth(req);
     const body = z
       .object({
         name: z.string().min(1).max(120).default('mcp-client'),
         user_id: z.string().uuid().optional(),
+        project_id: z.string().uuid().optional(),
       })
       .safeParse(req.body ?? {});
 
     const name = body.success ? body.data.name : 'mcp-client';
+    const requestedProjectId = body.success ? body.data.project_id : undefined;
     let targetUserId = ctx.userId;
 
     if (body.success && body.data.user_id && body.data.user_id !== ctx.userId) {
@@ -490,12 +558,26 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       targetUserId = target.id;
     }
 
+    let projectId: string;
+    if (requestedProjectId) {
+      const owned = await getProject(db, targetUserId, requestedProjectId);
+      if (!owned) {
+        return reply.code(400).send({
+          error: { code: 'project_not_found', message: '项目不存在' },
+        });
+      }
+      projectId = owned.id;
+    } else {
+      projectId = (await ensureDefaultProject(db, targetUserId)).id;
+    }
+
     const token = generateToken('ait');
     await db.query(
-      `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
-      [targetUserId, name, token, hashToken(token), ['tasks:read', 'tasks:write']],
+      `insert into api_tokens (user_id, name, token, token_hash, scopes, project_id)
+       values ($1,$2,$3,$4,$5,$6)`,
+      [targetUserId, name, token, hashToken(token), ['tasks:read', 'tasks:write'], projectId],
     );
-    return { token, name, user_id: targetUserId, created_at: new Date().toISOString() };
+    return { token, name, user_id: targetUserId, project_id: projectId, created_at: new Date().toISOString() };
   });
 
   // 删除令牌（只能删自己的；删掉后立即失效）
@@ -573,11 +655,13 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       return reply.code(400).send({ error: { code: 'invalid_argument', message } });
     }
 
-    // 同时签发一枚 PAT，省得用户再自己走一遍
+    // 同时签发一枚 PAT，省得用户再自己走一遍（挂到默认项目）
     const token = generateToken('ait');
+    const initialProject = await ensureDefaultProject(db, user.id);
     await db.query(
-      `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
-      [user.id, 'initial', token, hashToken(token), ['tasks:read', 'tasks:write']],
+      `insert into api_tokens (user_id, name, token, token_hash, scopes, project_id)
+       values ($1,$2,$3,$4,$5,$6)`,
+      [user.id, 'initial', token, hashToken(token), ['tasks:read', 'tasks:write'], initialProject.id],
     );
 
     return reply.code(201).send({
@@ -751,16 +835,33 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
         return reply.code(404).send({ error: { code: 'user_not_found', message: '用户不存在' } });
       }
       const body = z
-        .object({ name: z.string().min(1).max(120).default('mcp-client') })
+        .object({
+          name: z.string().min(1).max(120).default('mcp-client'),
+          project_id: z.string().uuid().optional(),
+        })
         .safeParse(req.body ?? {});
       const name = body.success ? body.data.name : 'mcp-client';
 
+      let projectId: string;
+      if (body.success && body.data.project_id) {
+        const owned = await getProject(db, target.id, body.data.project_id);
+        if (!owned) {
+          return reply.code(400).send({
+            error: { code: 'project_not_found', message: '项目不存在' },
+          });
+        }
+        projectId = owned.id;
+      } else {
+        projectId = (await ensureDefaultProject(db, target.id)).id;
+      }
+
       const token = generateToken('ait');
       await db.query(
-        `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
-        [target.id, name, token, hashToken(token), ['tasks:read', 'tasks:write']],
+        `insert into api_tokens (user_id, name, token, token_hash, scopes, project_id)
+         values ($1,$2,$3,$4,$5,$6)`,
+        [target.id, name, token, hashToken(token), ['tasks:read', 'tasks:write'], projectId],
       );
-      return { token, name, user_id: target.id, created_at: new Date().toISOString() };
+      return { token, name, user_id: target.id, project_id: projectId, created_at: new Date().toISOString() };
     },
   );
 
@@ -779,6 +880,24 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     }
     const input = parsed.data;
 
+    // 项目归属：令牌鉴权一律落进令牌绑定的项目（AI 推送不看请求里的项目字段）；
+    // 会话鉴权显式给 project_id（前端表单必选），否则兜底默认项目。
+    let projectId: string | null = null;
+    if (ctx.via === 'pat') {
+      const owned = ctx.projectId
+        ? await getProject(db, ctx.userId, ctx.projectId)
+        : null;
+      projectId = owned?.id ?? (await ensureDefaultProject(db, ctx.userId)).id;
+    } else if (input.project_id) {
+      const owned = await getProject(db, ctx.userId, input.project_id);
+      if (!owned) {
+        return reply.code(400).send({
+          error: { code: 'project_not_found', message: '项目不存在' },
+        });
+      }
+      projectId = owned.id;
+    }
+
     let sourceId: string | null = null;
     if (input.source?.session_key) {
       const source = await tasks.ensureSource(
@@ -795,7 +914,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       title: input.title,
       detail: input.detail ?? null,
       severity: input.severity,
-      project: input.project ?? null,
+      projectId,
+      project: projectId ? null : (input.project ?? null),
       links: input.links ?? [],
       sourceId,
       idempotencyKey: input.idempotency_key ?? null,
@@ -857,15 +977,25 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       return reply.code(400).send({ error: { code: 'invalid_argument', message: '参数不合法' } });
     }
     const p = parsed.data;
-    const task = await tasks.updateTask(ctx.userId, req.params.id, {
-      title: p.title,
-      detail: p.detail,
-      severity: p.severity,
-      project: p.project,
-      links: p.links,
-      notifyRequested: p.notify,
-      dueAt: p.due_at,
-    });
+    let task;
+    try {
+      task = await tasks.updateTask(ctx.userId, req.params.id, {
+        title: p.title,
+        detail: p.detail,
+        severity: p.severity,
+        projectId: p.project_id,
+        project: p.project,
+        links: p.links,
+        notifyRequested: p.notify,
+        dueAt: p.due_at,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message === '项目不存在') {
+        return reply.code(400).send({ error: { code: 'project_not_found', message } });
+      }
+      throw err;
+    }
     if (!task) {
       return reply.code(404).send({ error: { code: 'task_not_found', message: '任务不存在' } });
     }
@@ -1353,9 +1483,18 @@ export async function ensureBootstrapCredentials(
 
   if (!adminToken) {
     adminToken = generateToken('ait');
+    const bootstrapProject = await ensureDefaultProject(db, user.id);
     await db.query(
-      `insert into api_tokens (user_id, name, token, token_hash, scopes) values ($1,$2,$3,$4,$5)`,
-      [user.id, 'bootstrap (admin)', adminToken, hashToken(adminToken), ['admin', 'tasks:read', 'tasks:write']],
+      `insert into api_tokens (user_id, name, token, token_hash, scopes, project_id)
+       values ($1,$2,$3,$4,$5,$6)`,
+      [
+        user.id,
+        'bootstrap (admin)',
+        adminToken,
+        hashToken(adminToken),
+        ['admin', 'tasks:read', 'tasks:write'],
+        bootstrapProject.id,
+      ],
     );
   }
 

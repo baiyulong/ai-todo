@@ -154,6 +154,45 @@ create table if not exists api_tokens (
 -- 老令牌只有哈希、无法回填明文，这些行的 token 为空，界面上仅显示掩码。
 alter table api_tokens add column if not exists token text;
 
+-- ============ 项目 ============
+-- 项目是任务的一等维度：先有项目，令牌绑定项目，任务落在令牌的项目里。
+-- tasks.project 冗余存项目名（展示/筛选/分组直接用），project_id 才是权威关联。
+create table if not exists projects (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  name       text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists projects_user_name_uq
+  on projects (user_id, name);
+-- 每个用户至多一枚默认项目
+create unique index if not exists projects_default_uq
+  on projects (user_id) where is_default;
+
+alter table tasks add column if not exists project_id uuid references projects(id);
+alter table api_tokens add column if not exists project_id uuid references projects(id);
+
+-- 默认项目：每个用户一枚，幂等补种
+insert into projects (user_id, name, is_default)
+select u.id, '默认项目', true from users u
+on conflict do nothing;
+
+-- 老数据迁移：任务按名字归到同名项目，没名字的归默认项目
+insert into projects (user_id, name)
+select distinct user_id, project from tasks
+where project is not null and project <> ''
+on conflict do nothing;
+update tasks t set project_id = p.id
+from projects p
+where p.user_id = t.user_id
+  and p.name = coalesce(nullif(t.project, ''), '默认项目');
+
+-- 老令牌统一挂到所属用户的默认项目
+update api_tokens a set project_id = p.id
+from projects p
+where a.project_id is null and p.user_id = a.user_id and p.is_default;
+
 -- ============ Web 会话（浏览器登录后签发） ============
 create table if not exists sessions (
   id           uuid primary key default gen_random_uuid(),

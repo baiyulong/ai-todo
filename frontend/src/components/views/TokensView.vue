@@ -1,5 +1,6 @@
 <script setup>
-/* 令牌管理：签发 / 删除 MCP 访问令牌，支持随时复制 */
+/* 令牌管理：签发 / 删除 MCP 访问令牌，支持随时复制。
+ * 令牌必须绑定项目：通过令牌推送的任务都落进令牌的项目。 */
 
 import { ref, onMounted } from 'vue';
 import { api, translateError } from '../../api.js';
@@ -12,8 +13,23 @@ const ui = useUiStore();
 const session = useSessionStore();
 
 const name = ref('');
+const projectId = ref('');
+const projects = ref([]);
 const tokens = ref([]);
 const loading = ref(true);
+
+async function loadProjects() {
+  try {
+    const res = await api.get('/api/v1/projects');
+    projects.value = res.projects || [];
+    // 默认选中默认项目（后端把 is_default 排最前）
+    if (!projectId.value && projects.value.length) {
+      projectId.value = projects.value[0].id;
+    }
+  } catch (err) {
+    ui.toast(translateError(err), true);
+  }
+}
 
 async function loadTokens() {
   loading.value = true;
@@ -30,7 +46,10 @@ async function loadTokens() {
 
 async function issue() {
   try {
-    const res = await api.post('/api/v1/tokens', { name: name.value.trim() || 'mcp-client' });
+    const res = await api.post('/api/v1/tokens', {
+      name: name.value.trim() || 'mcp-client',
+      project_id: projectId.value || undefined,
+    });
     session.lastToken = res.token;
     name.value = '';
     ui.toast(t('token.issuedToast'));
@@ -66,7 +85,10 @@ async function copySecret(value) {
   ui.toast(ok ? t('token.copiedToast') : t('token.copyFailedToast'), !ok);
 }
 
-onMounted(loadTokens);
+onMounted(() => {
+  loadTokens();
+  loadProjects();
+});
 </script>
 
 <template>
@@ -89,7 +111,13 @@ onMounted(loadTokens);
             <div class="token-info">
               <div class="token-name">{{ tk.name }}</div>
               <code class="token-value" :title="tk.token ?? undefined">{{ displayToken(tk) }}</code>
-              <div class="token-meta">{{ tk.revoked_at ? t('token.revoked') : t('token.valid') }} · {{ lastUsed(tk) }}</div>
+              <div class="token-meta">
+                <template v-if="tk.project_name">
+                  <span>{{ tk.project_name }}</span>
+                  <span> · </span>
+                </template>
+                {{ tk.revoked_at ? t('token.revoked') : t('token.valid') }} · {{ lastUsed(tk) }}
+              </div>
             </div>
             <div class="token-actions">
               <button
@@ -115,6 +143,12 @@ onMounted(loadTokens);
           style="margin-top: 14px"
           :placeholder="t('token.namePlaceholder')"
         >
+        <label class="field" style="margin-top: 10px">
+          <span>{{ t('token.fieldProject') }}</span>
+          <select v-model="projectId" class="select" required>
+            <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </label>
         <button class="btn btn-primary btn-block" type="button" style="margin-top: 10px" @click="issue">
           {{ t('token.issue') }}
         </button>

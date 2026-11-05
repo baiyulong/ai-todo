@@ -61,6 +61,8 @@ export const dict = {
   'toolbar.filterSeverity': '按级别筛选',
   'toolbar.allSources': '全部来源',
   'toolbar.filterSource': '按来源筛选',
+  'toolbar.allProjects': '全部项目',
+  'toolbar.filterProject': '按项目筛选',
   'toolbar.searchPlaceholder': '搜索…',
   'toolbar.searchLabel': '搜索任务',
 
@@ -125,7 +127,6 @@ export const dict = {
   'taskDialog.detailPlaceholder': '补充上下文',
   'taskDialog.fieldSeverity': '级别',
   'taskDialog.fieldProject': '项目',
-  'taskDialog.projectPlaceholder': '可选',
   'taskDialog.notify': '立即提醒我',
   'taskDialog.cancel': '取消',
   'taskDialog.submit': '添加',
@@ -211,7 +212,7 @@ export const dict = {
   'password.mismatch': '两次输入的新密码不一致',
 
   // ---------------- 访问令牌 ----------------
-  'token.hint': 'AI 客户端通过 MCP 推送任务时，需要一枚属于你的访问令牌。凭证必须写在客户端的环境变量 AI_TODO_TOKEN 里，令牌可随时在下方列表中复制。',
+  'token.hint': 'AI 客户端通过 MCP 推送任务时，需要一枚属于你的访问令牌。凭证必须写在客户端的环境变量 AI_TODO_TOKEN 里，令牌可随时在下方列表中复制。令牌签发时绑定项目，AI 推送的任务都会落进令牌绑定的项目。',
   'token.loadFailed': '令牌列表加载失败：{message}',
   'token.empty': '还没有签发任何令牌。',
   'token.lastUsed': '最近使用 {time}',
@@ -221,11 +222,27 @@ export const dict = {
   'token.delete': '删除',
   'token.deletedToast': '令牌已删除',
   'token.namePlaceholder': '令牌名称，如 claude-code',
+  'token.fieldProject': '绑定项目（推送的任务会落进这个项目）',
   'token.issue': '签发新令牌',
   'token.issuedToast': '令牌已签发，请立即复制保存',
   'token.copy': '复制',
   'token.copiedToast': '已复制',
   'token.copyFailedToast': '复制失败，请手动选中复制',
+
+  // ---------------- 项目 ----------------
+  'topbar.projects': '项目',
+  'page.projectsTitle': '项目管理',
+  'project.hint': '任务必须挂在项目下：先建项目，签发令牌时选好绑定项目，AI 推送的任务就会自动落进令牌绑定的项目。每个账号都有一枚不可删除的默认项目。',
+  'project.empty': '还没有项目。',
+  'project.namePlaceholder': '项目名称',
+  'project.create': '新建项目',
+  'project.defaultBadge': '默认',
+  'project.taskCount': '{count} 个任务',
+  'project.delete': '删除',
+  'project.deleteTitle': '删除项目「{name}」？',
+  'project.deleteText': '项目下的 {count} 个任务和绑定它的令牌都会挪到默认项目。',
+  'project.createdToast': '项目已创建',
+  'project.deletedToast': '项目已删除',
 
   // ---------------- 主题动效 ----------------
   'fx.paperCornerHint': '点一下，起一阵风',
@@ -329,6 +346,10 @@ export const dict = {
   'error.task_not_found': '任务不存在',
   'error.task_not_archived': '这条任务还没归档，不能彻底删除',
   'error.token_not_found': '令牌不存在',
+  'error.project_not_found': '项目不存在',
+  'error.project_name_taken': '同名项目已存在',
+  'error.project_default_undeletable': '默认项目不能删除',
+  'error.project_name_invalid': '项目名需为 1~120 个字符',
   'error.user_not_found': '用户不存在',
 
   // ---------------- 微信登录 ----------------

@@ -22,6 +22,7 @@ import Banners from './components/layout/Banners.vue';
 import TasksView from './components/views/TasksView.vue';
 import UsersView from './components/views/UsersView.vue';
 import TokensView from './components/views/TokensView.vue';
+import ProjectsView from './components/views/ProjectsView.vue';
 import AppDrawer from './components/layout/AppDrawer.vue';
 import ToastCenter from './components/layout/ToastCenter.vue';
 import TaskFormDrawer from './components/dialogs/TaskFormDrawer.vue';
@@ -156,6 +157,7 @@ onUnmounted(() => {
     <TasksView v-if="ui.view === 'tasks'" />
     <UsersView v-else-if="ui.view === 'users'" />
     <TokensView v-else-if="ui.view === 'tokens'" />
+    <ProjectsView v-else-if="ui.view === 'projects'" />
 
     <!-- 手动新增任务（仅任务视图显示） -->
     <button

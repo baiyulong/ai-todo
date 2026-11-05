@@ -4,6 +4,7 @@
 import { ref, watch, nextTick, onUnmounted } from 'vue';
 import { useUiStore } from '../../stores/ui.js';
 import { useTasksStore } from '../../stores/tasks.js';
+import { api, translateError } from '../../api.js';
 import { t } from '../../i18n.js';
 
 const ui = useUiStore();
@@ -11,10 +12,24 @@ const tasks = useTasksStore();
 
 const title = ref('');
 const detail = ref('');
-const project = ref('');
+const projectId = ref('');
+const projects = ref([]);
 const severity = ref('need_human');
 const notify = ref(true);
 const titleInput = ref(null);
+
+async function loadProjects() {
+  try {
+    const res = await api.get('/api/v1/projects');
+    projects.value = res.projects || [];
+    // 默认选中默认项目（后端把 is_default 排最前）；选不中就用第一项
+    if (!projects.value.some((p) => p.id === projectId.value)) {
+      projectId.value = projects.value[0]?.id ?? '';
+    }
+  } catch (err) {
+    ui.toast(translateError(err), true);
+  }
+}
 
 // 每次打开重置表单，并把焦点放到标题输入框
 watch(
@@ -23,9 +38,9 @@ watch(
     if (open) {
       title.value = '';
       detail.value = '';
-      project.value = '';
       severity.value = 'need_human';
       notify.value = true;
+      loadProjects();
       await nextTick();
       titleInput.value?.focus();
       document.addEventListener('keydown', onKeydown);
@@ -47,14 +62,14 @@ function close() {
 
 async function submit() {
   const t0 = title.value.trim();
-  if (!t0) return;
+  if (!t0 || !projectId.value) return;
   try {
     // 所有字段读取要落在第一个 await 之前：抽屉一旦关闭，模型就重置了
     const payload = {
       title: t0,
       detail: detail.value.trim() || undefined,
       severity: severity.value,
-      project: project.value.trim() || undefined,
+      project_id: projectId.value,
       notify: notify.value,
     };
     close();
@@ -94,7 +109,9 @@ async function submit() {
             </label>
             <label class="field">
               <span>{{ t('taskDialog.fieldProject') }}</span>
-              <input v-model="project" class="input" maxlength="120" :placeholder="t('taskDialog.projectPlaceholder')">
+              <select v-model="projectId" class="select" required>
+                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
             </label>
             <label class="check">
               <input v-model="notify" type="checkbox">

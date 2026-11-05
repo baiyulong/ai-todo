@@ -782,6 +782,83 @@ async function main() {
     JSON.stringify(afterDeleteList.body.tokens.map((t) => t.id)),
   );
 
+  /* 11b. 项目维度 */
+  console.log('\n[11b] 项目维度：项目 / 令牌绑定 / 任务归属');
+  const projName = `e2e-proj-${runId}`;
+  const projCreate = await userApi('/api/v1/projects', {
+    method: 'POST',
+    cookie: userCookie,
+    body: JSON.stringify({ name: projName }),
+  });
+  check('可以创建项目', projCreate.res.status === 201, `HTTP ${projCreate.res.status}`);
+  const projId = projCreate.body.project?.id;
+
+  const projDup = await userApi('/api/v1/projects', {
+    method: 'POST',
+    cookie: userCookie,
+    body: JSON.stringify({ name: projName }),
+  });
+  check('重名项目被拒 409', projDup.res.status === 409, `HTTP ${projDup.res.status}`);
+
+  const projList = await userApi('/api/v1/projects', { cookie: userCookie });
+  const defaultProj = (projList.body.projects || []).find((p) => p.is_default);
+  check('每个账号都有默认项目', !!defaultProj, JSON.stringify((projList.body.projects || []).map((p) => p.name)));
+  check('项目列表带任务数', (projList.body.projects || []).every((p) => typeof p.task_count === 'number'));
+
+  // 会话建任务：显式 project_id
+  const projTask = await userApi('/api/v1/tasks', {
+    method: 'POST',
+    cookie: userCookie,
+    body: JSON.stringify({ title: `项目任务 ${projName}`, project_id: projId }),
+  });
+  check(
+    '会话建任务落在指定项目',
+    projTask.res.status === 201 && projTask.body.task?.project === projName,
+    JSON.stringify(projTask.body.task?.project),
+  );
+
+  // 令牌绑定项目：PAT 推送强制落进令牌的项目，请求里的 project 字段被忽略
+  const projToken = await userApi('/api/v1/tokens', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'proj-token', project_id: projId }),
+  });
+  check(
+    '签发令牌可绑定项目',
+    projToken.res.status === 200 && !!projToken.body.project_id,
+    `HTTP ${projToken.res.status}`,
+  );
+  const patTask = await userApi('/api/v1/tasks', {
+    method: 'POST',
+    token: projToken.body.token,
+    body: JSON.stringify({ title: '令牌项目任务', project: '不该出现的项目' }),
+  });
+  check(
+    '令牌推送的任务强制落进令牌的项目',
+    patTask.res.status === 201 && patTask.body.task?.project === projName,
+    JSON.stringify(patTask.body.task?.project),
+  );
+
+  // 令牌列表带绑定项目名
+  const tokListWithProj = await userApi('/api/v1/tokens');
+  const projTokRow = (tokListWithProj.body.tokens || []).find((t) => t.name === 'proj-token');
+  check(
+    '令牌列表返回绑定项目名',
+    projTokRow?.project_name === projName,
+    JSON.stringify(projTokRow?.project_name),
+  );
+
+  // 删除项目：项目下的任务与令牌挪进默认项目
+  const projDel = await userApi(`/api/v1/projects/${projId}`, { method: 'DELETE' });
+  check('可以删除非默认项目', projDel.res.status === 200, `HTTP ${projDel.res.status}`);
+  const movedTask = await userApi(`/api/v1/tasks/${projTask.body.task.id}`, { cookie: userCookie });
+  check(
+    '删除项目后任务挪进默认项目',
+    movedTask.body.task?.project === '默认项目',
+    JSON.stringify(movedTask.body.task?.project),
+  );
+  const delDefault = await userApi(`/api/v1/projects/${defaultProj.id}`, { method: 'DELETE' });
+  check('默认项目不可删除 409', delDefault.res.status === 409, `HTTP ${delDefault.res.status}`);
+
   /* 12. MCP stdio */
   console.log('\n[12] MCP stdio 协议');
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');

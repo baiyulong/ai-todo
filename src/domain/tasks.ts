@@ -1,4 +1,5 @@
 import type { Db } from '../db/index.js';
+import { ensureDefaultProject, ensureProjectByName } from './projects.js';
 import type {
   GroupBy,
   Link,
@@ -16,6 +17,9 @@ export interface CreateTaskInput {
   title: string;
   detail?: string | null;
   severity?: TaskSeverity;
+  /** 项目 id（权威关联）；与 project 二选一，都没有时落到默认项目 */
+  projectId?: string | null;
+  /** 项目名（兼容旧调用/按名字自动建项目） */
   project?: string | null;
   links?: Link[];
   sourceId?: string | null;
@@ -69,11 +73,32 @@ export class TaskService {
     const severity = input.severity ?? 'need_human';
     const links = JSON.stringify(input.links ?? []);
 
+    // 项目归属解析：显式 id → 项目名 → 默认项目。
+    // 任务永远挂在一个真实存在的项目下（没有项目不允许创建任务）。
+    let projectId = input.projectId ?? null;
+    let projectName = input.project ?? null;
+    if (projectId) {
+      const owned = await this.db.query<{ name: string }>(
+        `select name from projects where id = $1 and user_id = $2`,
+        [projectId, input.userId],
+      );
+      if (!owned.rows[0]) throw new Error('项目不存在');
+      projectName = owned.rows[0].name;
+    } else if (projectName) {
+      const ensured = await ensureProjectByName(this.db, input.userId, projectName);
+      projectId = ensured.id;
+      projectName = ensured.name;
+    } else {
+      const fallback = await ensureDefaultProject(this.db, input.userId);
+      projectId = fallback.id;
+      projectName = fallback.name;
+    }
+
     const inserted = await this.db.query<Task>(
       `insert into tasks
-         (user_id, title, detail, severity, project, links, source_id,
+         (user_id, title, detail, severity, project, project_id, links, source_id,
           idempotency_key, notify_requested, due_at)
-       values ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10)
+       values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11)
        on conflict (user_id, idempotency_key) where idempotency_key is not null
        do nothing
        returning *`,
@@ -82,7 +107,8 @@ export class TaskService {
         input.title,
         input.detail ?? null,
         severity,
-        input.project ?? null,
+        projectName,
+        projectId,
         links,
         input.sourceId ?? null,
         input.idempotencyKey ?? null,
@@ -266,6 +292,9 @@ export class TaskService {
       title: string;
       detail: string | null;
       severity: TaskSeverity;
+      /** 直接换项目（权威） */
+      projectId: string | null;
+      /** 按项目名换项目：找不到同名项目会自动创建 */
       project: string | null;
       links: Link[];
       notifyRequested: boolean;
@@ -283,7 +312,31 @@ export class TaskService {
     if (patch.title !== undefined) push('title', patch.title);
     if (patch.detail !== undefined) push('detail', patch.detail);
     if (patch.severity !== undefined) push('severity', patch.severity);
-    if (patch.project !== undefined) push('project', patch.project);
+    if (patch.projectId !== undefined) {
+      if (patch.projectId === null) {
+        const fallback = await ensureDefaultProject(this.db, userId);
+        push('project_id', fallback.id);
+        push('project', fallback.name);
+      } else {
+        const owned = await this.db.query<{ name: string }>(
+          `select name from projects where id = $1 and user_id = $2`,
+          [patch.projectId, userId],
+        );
+        if (!owned.rows[0]) throw new Error('项目不存在');
+        push('project_id', patch.projectId);
+        push('project', owned.rows[0].name);
+      }
+    } else if (patch.project !== undefined) {
+      if (patch.project === null) {
+        const fallback = await ensureDefaultProject(this.db, userId);
+        push('project_id', fallback.id);
+        push('project', fallback.name);
+      } else {
+        const ensured = await ensureProjectByName(this.db, userId, patch.project);
+        push('project_id', ensured.id);
+        push('project', ensured.name);
+      }
+    }
     if (patch.links !== undefined) {
       params.push(JSON.stringify(patch.links));
       sets.push(`links = $${params.length}::jsonb`);
