@@ -34,7 +34,6 @@ export const dict = {
   'topbar.reconnecting': '重连中',
   'topbar.offline': '未登录',
   'topbar.currentAccount': '当前账号',
-  'topbar.accountSettings': '设置',
   'topbar.tokens': '令牌管理',
   'topbar.users': '用户管理',
   'topbar.logout': '退出登录',

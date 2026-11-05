@@ -34,7 +34,6 @@ export const dict = {
   'topbar.reconnecting': 'Reconnecting',
   'topbar.offline': 'Signed out',
   'topbar.currentAccount': 'Current account',
-  'topbar.accountSettings': 'Settings',
   'topbar.tokens': 'Tokens',
   'topbar.users': 'Users',
   'topbar.logout': 'Sign out',

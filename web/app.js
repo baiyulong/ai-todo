@@ -145,10 +145,6 @@ $('btn-user').addEventListener('click', (e) => {
   e.stopPropagation();
   setUserMenu($('user-dropdown').hidden);
 });
-$('dd-account').addEventListener('click', () => {
-  closeUserMenu();
-  openDrawer('settings');
-});
 $('dd-tokens').addEventListener('click', () => {
   closeUserMenu();
   setView('tokens');
