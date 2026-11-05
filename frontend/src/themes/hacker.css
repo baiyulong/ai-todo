@@ -153,3 +153,35 @@
 [data-theme='hacker'] .drawer-section > h3 { letter-spacing: 0.12em; }
 [data-theme='hacker'] .hint,
 [data-theme='hacker'] .status-row .k { color: var(--muted); }
+
+/* ------------------------------------------------------------
+   乱码雨：每 5 秒左右一串字符从上缓缓划过（JS 在 hackerFx.js 生成）
+   低透明度纯装饰，pointer-events: none 不挡任何交互
+   ------------------------------------------------------------ */
+[data-theme='hacker'] .hacker-rain-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+[data-theme='hacker'] .hacker-rain-col {
+  position: absolute;
+  top: -40vh;
+  width: 1.4em;
+  word-break: break-all;
+  line-height: 1.5;
+  font-family: var(--mono);
+  color: var(--accent);
+  opacity: 0;
+  text-shadow: 0 0 8px rgba(51, 255, 102, 0.55);
+  animation-name: hacker-drop;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes hacker-drop {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 0.15; }
+  80% { opacity: 0.15; }
+  100% { transform: translateY(180vh); opacity: 0; }
+}

@@ -13,6 +13,7 @@ import {
   playNotifySound,
   showDesktopNotification,
 } from './composables/notify.js';
+import { startHackerFx, stopHackerFx } from './composables/hackerFx.js';
 
 import LoginView from './components/views/LoginView.vue';
 import TopBar from './components/layout/TopBar.vue';
@@ -113,6 +114,16 @@ function onKeydown(e) {
   }
 }
 
+/* 黑客风动态效果只在该主题下运行，切走即停 */
+watch(
+  () => ui.theme,
+  (th) => {
+    if (th === 'hacker') startHackerFx();
+    else stopHackerFx();
+  },
+  { immediate: true },
+);
+
 /* ---------------- 启动 ---------------- */
 
 onMounted(async () => {
@@ -124,6 +135,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown);
+  stopHackerFx();
   if (es) es.close();
 });
 </script>
