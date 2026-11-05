@@ -15,8 +15,8 @@
   --bg: #ebe7e4;
   --surface: #f3f2f0;
   --surface-2: #eeebe8;
-  --topbar-bg: rgba(243, 242, 240, 0.88);
-  --drawer-bg: rgba(243, 242, 240, 0.94);
+  --topbar-bg: rgba(243, 242, 240, 0.97);
+  --drawer-bg: rgba(243, 242, 240, 0.98);
   --dropdown-bg: #f4f2f0;
   --border: rgba(139, 132, 125, 0.35);
   --border-strong: rgba(92, 87, 82, 0.45);
@@ -70,8 +70,8 @@
     --bg: #211f1d;
     --surface: #292623;
     --surface-2: #242220;
-    --topbar-bg: rgba(33, 31, 29, 0.88);
-    --drawer-bg: rgba(33, 31, 29, 0.94);
+    --topbar-bg: rgba(33, 31, 29, 0.97);
+    --drawer-bg: rgba(33, 31, 29, 0.98);
     --dropdown-bg: #292623;
     --border: rgba(235, 231, 228, 0.14);
     --border-strong: rgba(235, 231, 228, 0.26);
@@ -126,7 +126,7 @@
     20px 20px,
     20px 20px;
   background-position: 0 0;
-  opacity: 0.5;
+  opacity: 0.22;
 }
 
 /* 边缘轻 vignette，像旧纸的四角 */
