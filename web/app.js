@@ -465,6 +465,8 @@ async function bootstrap() {
   loadUsers();
   connectStream();
   registerServiceWorker();
+  // 先拿到实时权限状态，横幅/抽屉才不会显示过期的「已拒绝」
+  await refreshNotifyPermission();
   updateNotifyBanner();
   updateEmailBanner();
   applyDeepLink();
@@ -1097,7 +1099,7 @@ async function showDesktopNotification(payload) {
     toast(`${title}${body ? '：' + body.split('\n')[0] : ''}`);
     return;
   }
-  if (Notification.permission !== 'granted') {
+  if (notifyPermState !== 'granted') {
     toast(`${title}${body ? '：' + body.split('\n')[0] : ''}`);
     return;
   }
@@ -1156,12 +1158,40 @@ async function getActiveRegistration() {
 
 /* ---------------------------------------------------------------- 通知权限 */
 
+/**
+ * 通知权限状态的权威来源。
+ *
+ * 不能直接用 Notification.permission：它是页面加载时的快照，用户在浏览器
+ * 地址栏（站点权限）里把通知改成「允许」后，这个值经常停留在旧的 denied，
+ * 设置抽屉就会一直显示「已拒绝」。Permissions API 才是实时值，还带
+ * onchange 回调——权限一变，横幅和抽屉立即跟上，不需要刷新页面。
+ */
+let notifyPermState = 'Notification' in window ? Notification.permission : 'unsupported';
+
+async function refreshNotifyPermission() {
+  if (!('Notification' in window)) {
+    notifyPermState = 'unsupported';
+    return;
+  }
+  try {
+    const st = await navigator.permissions.query({ name: 'notifications' });
+    notifyPermState = st.state;
+    st.onchange = () => {
+      notifyPermState = st.state;
+      updateNotifyBanner();
+      renderDrawerIfOpen();
+    };
+  } catch {
+    // 个别浏览器不支持 notifications 这个 PermissionName：退回同步快照
+    notifyPermState = Notification.permission;
+  }
+}
+
 function updateNotifyBanner() {
   const banner = $('notify-banner');
-  const supported = 'Notification' in window;
-  const permission = supported ? Notification.permission : 'unsupported';
+  const permission = notifyPermState;
 
-  if (!supported) {
+  if (permission === 'unsupported') {
     banner.hidden = false;
     $('notify-banner-text').textContent = t('banner.unsupported');
     $('btn-enable-notify').hidden = true;
@@ -1182,6 +1212,7 @@ function updateNotifyBanner() {
 $('btn-enable-notify').addEventListener('click', async () => {
   if (!('Notification' in window)) return;
   const perm = await Notification.requestPermission();
+  await refreshNotifyPermission();
   if (perm === 'granted') {
     updateNotifyBanner();
     toast(t('notify.enabledToast'));
@@ -1311,7 +1342,9 @@ function openDrawer(mode) {
   state.drawerMode = mode;
   $('drawer').hidden = false;
   $('drawer-backdrop').hidden = false;
-  renderDrawer();
+  // 打开前先同步权限状态（PermissionStatus.onchange 只在页面活着时生效，
+  // 页面加载前浏览器里改过的设置靠这里兜底拉到最新值）
+  refreshNotifyPermission().then(renderDrawer);
 }
 
 function closeDrawer() {
@@ -1354,14 +1387,19 @@ window.addEventListener('ai-todo:localechange', () => {
 });
 
 function renderDrawerIfOpen() {
-  if (state.drawerMode && !$('drawer').hidden) renderDrawer();
+  if (state.drawerMode && !$('drawer').hidden) {
+    // 打开/重绘抽屉前同步一次权限状态，防止显示过期的「已拒绝」
+    refreshNotifyPermission().then(renderDrawer);
+    return;
+  }
 }
 
 function renderDrawer() {
   const body = $('drawer-body');
   body.textContent = '';
   const rules = state.rules || state.me?.rules;
-  const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+  // 用实时权限状态：Notification.permission 快照在浏览器站点设置改动后不更新
+  const perm = notifyPermState;
 
   if (state.drawerMode === 'rules') {
     $('drawer-title').textContent = t('drawer.rules');
