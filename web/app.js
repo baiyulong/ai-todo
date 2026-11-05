@@ -1345,6 +1345,63 @@ function renderDrawer() {
   s2.appendChild(logout);
   body.appendChild(s2);
 
+  // 修改密码：微信-only 账号（没设过密码）第一次是「设置密码」，不用填旧密码
+  if (state.me) {
+    const s2p = section(state.me.has_password ? t('password.change') : t('password.set'));
+
+    const pwOld = document.createElement('input');
+    pwOld.className = 'input';
+    pwOld.type = 'password';
+    pwOld.autocomplete = 'current-password';
+    pwOld.placeholder = t('password.old');
+    pwOld.style.marginBottom = '8px';
+
+    const pwNew = document.createElement('input');
+    pwNew.className = 'input';
+    pwNew.type = 'password';
+    pwNew.autocomplete = 'new-password';
+    pwNew.placeholder = `${t('password.new')} · ${t('password.newPlaceholder')}`;
+    pwNew.style.marginBottom = '8px';
+
+    const pwConfirm = document.createElement('input');
+    pwConfirm.className = 'input';
+    pwConfirm.type = 'password';
+    pwConfirm.autocomplete = 'new-password';
+    pwConfirm.placeholder = t('password.confirm');
+    pwConfirm.style.marginBottom = '10px';
+
+    const pwSave = document.createElement('button');
+    pwSave.type = 'button';
+    pwSave.className = 'btn btn-primary btn-block';
+    pwSave.textContent = t('password.save');
+    pwSave.addEventListener('click', async () => {
+      if (pwNew.value !== pwConfirm.value) {
+        toast(t('password.mismatch'), true);
+        return;
+      }
+      try {
+        await api.post('/api/v1/me/password', {
+          old_password: state.me.has_password ? pwOld.value : undefined,
+          new_password: pwNew.value,
+        });
+        pwOld.value = '';
+        pwNew.value = '';
+        pwConfirm.value = '';
+        state.me.has_password = true;
+        toast(t('password.changedToast'));
+        renderDrawer();
+      } catch (err) {
+        toast(translateError(err), true);
+      }
+    });
+
+    if (state.me.has_password) s2p.appendChild(pwOld);
+    s2p.appendChild(pwNew);
+    s2p.appendChild(pwConfirm);
+    s2p.appendChild(pwSave);
+    body.appendChild(s2p);
+  }
+
   // 语言
   const s2b = section(t('section.language'));
   for (const [code, meta] of Object.entries(LOCALES)) {

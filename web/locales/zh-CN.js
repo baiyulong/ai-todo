@@ -171,6 +171,17 @@ export const dict = {
   'perm.default': '未设置',
   'perm.unsupported': '不支持',
 
+  // ---------------- 修改密码 ----------------
+  'password.change': '修改密码',
+  'password.set': '设置密码',
+  'password.old': '当前密码',
+  'password.new': '新密码',
+  'password.confirm': '确认新密码',
+  'password.newPlaceholder': '至少 8 位',
+  'password.save': '保存新密码',
+  'password.changedToast': '密码已修改',
+  'password.mismatch': '两次输入的新密码不一致',
+
   // ---------------- 访问令牌 ----------------
   'token.hint': 'AI 客户端通过 MCP 推送任务时，需要一枚属于你的访问令牌。凭证必须写在客户端的环境变量 AI_TODO_TOKEN 里，令牌明文只在签发时显示一次。',
   'token.loadFailed': '令牌列表加载失败：{message}',
@@ -267,6 +278,7 @@ export const dict = {
   // ---------------- 服务端错误（按 code 翻译） ----------------
   'error.unauthorized': '登录已失效，请重新登录',
   'error.invalid_credentials': '用户名或密码不正确',
+  'error.wrong_password': '当前密码不正确',
   'error.invalid_argument': '参数不合法',
   'error.invalid_argument.enum': '参数 {param} 取值非法：{value}；可选值 {allowed}',
   'error.invalid_argument.uuid': '路径参数 {param} 不是合法的 UUID：{value}',

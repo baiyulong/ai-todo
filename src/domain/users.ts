@@ -269,6 +269,29 @@ export class UserService {
     await this.db.query(`update users set password_hash = $2 where id = $1`, [userId, hash]);
   }
 
+  /**
+   * 校验某个用户当前的密码（自助改密用：改前必须验旧密码）。
+   * 没设过密码的账号（微信-only）一律返回 false。
+   */
+  async verifyPasswordById(userId: string, password: string): Promise<boolean> {
+    const res = await this.db.query<{ password_hash: string | null }>(
+      `select password_hash from users where id = $1`,
+      [userId],
+    );
+    const hash = res.rows[0]?.password_hash;
+    if (!hash) return false;
+    return verifyPassword(password, hash);
+  }
+
+  /** 账号是否设有密码。微信-only 账号首次设置密码时不用验旧密码。 */
+  async hasPassword(userId: string): Promise<boolean> {
+    const res = await this.db.query<{ password_hash: string | null }>(
+      `select password_hash from users where id = $1`,
+      [userId],
+    );
+    return !!res.rows[0]?.password_hash;
+  }
+
   async setActive(userId: string, active: boolean): Promise<void> {
     await this.db.query(`update users set is_active = $2 where id = $1`, [userId, active]);
     // 禁用账号即刻吊销其会话与令牌，避免已登录的浏览器继续访问

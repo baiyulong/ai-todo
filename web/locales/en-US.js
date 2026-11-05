@@ -171,6 +171,17 @@ export const dict = {
   'perm.default': 'Not set',
   'perm.unsupported': 'Unsupported',
 
+  // ---------------- Change password ----------------
+  'password.change': 'Change password',
+  'password.set': 'Set a password',
+  'password.old': 'Current password',
+  'password.new': 'New password',
+  'password.confirm': 'Confirm new password',
+  'password.newPlaceholder': 'At least 8 characters',
+  'password.save': 'Save new password',
+  'password.changedToast': 'Password updated',
+  'password.mismatch': 'The two new passwords do not match',
+
   // ---------------- Access tokens ----------------
   'token.hint': 'To push tasks over MCP, your AI client needs an access token of your own. The credential must live in the client’s AI_TODO_TOKEN environment variable — the plain token is shown only once, at issue time.',
   'token.loadFailed': 'Could not load tokens: {message}',
@@ -267,6 +278,7 @@ export const dict = {
   // ---------------- Server errors (translated by code) ----------------
   'error.unauthorized': 'Your session expired — please sign in again',
   'error.invalid_credentials': 'Incorrect username or password',
+  'error.wrong_password': 'Current password is incorrect',
   'error.invalid_argument': 'Invalid argument',
   'error.invalid_argument.enum': 'Invalid value for {param}: {value}. Allowed: {allowed}',
   'error.invalid_argument.uuid': 'Path parameter {param} is not a valid UUID: {value}',

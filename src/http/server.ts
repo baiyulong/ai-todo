@@ -821,12 +821,13 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
   app.get('/api/v1/me', { preHandler: authHooks }, async (req) => {
     const ctx = currentAuth(req);
-    const [rules, pending, archived, sources, user] = await Promise.all([
+    const [rules, pending, archived, sources, user, hasPw] = await Promise.all([
       tasks.getRules(ctx.userId),
       tasks.countPending(ctx.userId),
       tasks.countArchived(ctx.userId),
       tasks.listSources(ctx.userId),
       users.findById(ctx.userId),
+      users.hasPassword(ctx.userId),
     ]);
     return {
       user_id: ctx.userId,
@@ -836,6 +837,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       // 是否已绑定微信：界面据此显示「绑定 / 重新绑定」
       wechat_bound: !!user?.wechat_openid,
       wechat_nickname: user?.wechat_nickname ?? null,
+      // 是否设有密码：微信-only 账号第一次是「设置密码」，不用填旧密码
+      has_password: hasPw,
       pending,
       archived,
       rules,
@@ -846,6 +849,50 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
         digest_hour: rules.digest_hour,
       },
     };
+  });
+
+  // 用户自助修改密码。
+  // 改前必须验旧密码——会话 Cookie 在手不等于本人：浏览器被借用或会话被偷时，
+  // 旧密码是最后一道闸。微信-only 账号没有旧密码，首次设置时放行不验。
+  app.post('/api/v1/me/password', { preHandler: authHooks }, async (req, reply) => {
+    const ctx = currentAuth(req);
+    const body = z
+      .object({
+        old_password: z.string().max(200).optional().default(''),
+        new_password: z.string().min(8).max(200),
+      })
+      .safeParse(req.body);
+    if (!body.success) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'invalid_argument', message: '新密码至少 8 位' } });
+    }
+
+    if (await users.hasPassword(ctx.userId)) {
+      const ok = await users.verifyPasswordById(ctx.userId, body.data.old_password);
+      if (!ok) {
+        return reply
+          .code(400)
+          .send({ error: { code: 'wrong_password', message: '当前密码不正确' } });
+      }
+    }
+
+    await users.setPassword(ctx.userId, body.data.new_password);
+
+    // 改密后吊销其它所有会话：偷到旧 Cookie 的人不能继续用。
+    // 当前这条会话保留——否则刚改完密码自己就被踢回登录页。
+    const currentToken = (
+      req as FastifyRequest & { cookies?: Record<string, string> }
+    ).cookies?.[config.cookieName];
+    if (currentToken) {
+      await db.query(`delete from sessions where user_id = $1 and token_hash <> $2`, [
+        ctx.userId,
+        hashToken(currentToken),
+      ]);
+    } else {
+      await db.query(`delete from sessions where user_id = $1`, [ctx.userId]);
+    }
+    return { ok: true };
   });
 
   app.get('/api/v1/health', async () => ({ ok: true, driver: db.driver }));
