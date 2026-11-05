@@ -272,7 +272,7 @@ select.select { cursor: pointer; }
 .task.is-done .task-title { text-decoration: line-through; }
 .task.is-archived { opacity: 0.5; background: var(--surface-2); }
 
-.task-top { display: flex; align-items: flex-start; gap: 8px; }
+.task-top { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
 .task-title {
   flex: 1;
   font-size: 15px;

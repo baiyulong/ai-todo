@@ -56,9 +56,10 @@ function formatTime(iso) {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function onCardClick(e) {
-  // 按钮和链接有自己的行为，别抢
-  if (e.target.closest('button, a')) return;
+function onHeaderClick() {
+  // 在标题上拖选了文字时不切换，避免想复制标题却把卡片收起来了
+  const sel = window.getSelection?.();
+  if (sel && String(sel).length > 0) return;
   tasks.selectTask(props.task.id);
 }
 
@@ -107,9 +108,9 @@ async function doTransfer() {
     :data-id="task.id"
     :data-severity="task.severity"
     :class="{ 'is-done': task.status === 'done', 'is-archived': isArchived, 'is-selected': selected }"
-    @click="onCardClick"
   >
-    <div class="task-top">
+    <!-- 只有标题行负责展开/收起：卡片内容区保持安静的文本区，可以随意选中复制 -->
+    <div class="task-top" @click="onHeaderClick">
       <h3 class="task-title">{{ task.title }}</h3>
 
       <!-- 删除：右上角图标，鼠标移到卡片上才显现。
