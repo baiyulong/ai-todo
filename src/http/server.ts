@@ -719,7 +719,20 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       if (!target) {
         return reply.code(404).send({ error: { code: 'user_not_found', message: '用户不存在' } });
       }
-      // tasks / sessions / api_tokens 都是 on delete cascade
+      // 最后一个管理员不能删：删了就没人能进用户管理页了
+      if (target.is_admin) {
+        const remaining = await db.query<{ n: number }>(
+          `select count(*)::int as n from users where is_admin and id <> $1`,
+          [target.id],
+        );
+        if ((remaining.rows[0]?.n ?? 0) === 0) {
+          return reply.code(400).send({
+            error: { code: 'last_admin', message: '不能删除最后一个管理员账号' },
+          });
+        }
+      }
+      // tasks / notifications / sessions / api_tokens / ai_sources / events /
+      // rules / 验证码等全部 on delete cascade，删用户即清空其所有记录
       await db.query(`delete from users where id = $1`, [req.params.id]);
       return { ok: true };
     },

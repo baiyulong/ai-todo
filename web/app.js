@@ -1850,6 +1850,28 @@ function userTableRow(isHead, u) {
   });
   cellActions.appendChild(reset);
 
+  // 删除账号：永久清除其所有任务/通知/令牌/会话记录，不可恢复。
+  // 自己的行不显示——后端也拦，但界面上就不该出现这个按钮。
+  if (!isSelf) {
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-sm btn-quiet btn-danger';
+    del.textContent = t('user.delete');
+    del.title = t('user.deleteTitle');
+    del.addEventListener('click', async () => {
+      const name = u.username || t('user.noUsername');
+      if (!window.confirm(t('user.deleteConfirm', { username: name }))) return;
+      try {
+        await api.del(`/api/v1/admin/users/${u.id}`);
+        toast(t('user.deletedToast', { username: name }));
+        renderUsersPage();
+      } catch (err) {
+        toast(translateError(err), true);
+      }
+    });
+    cellActions.appendChild(del);
+  }
+
   row.append(cellUser, cellRole, cellStatus, cellActions);
   return row;
 }
