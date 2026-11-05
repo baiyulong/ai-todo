@@ -72,6 +72,7 @@ export interface MailConfig {
   /** 465 为 true（隐式 TLS），587 等为 false（STARTTLS） */
   secure: boolean;
   user: string;
+  /** 认证凭据：授权码（QQ/163 等云邮箱）或密码，走 nodemailer 的 auth.pass */
   pass: string;
   /** 发件人，如 "AI Todo <no-reply@example.com>" */
   from: string;
@@ -132,7 +133,10 @@ export function loadConfig(): Config {
     port: mailPort,
     secure: (mailSecure || (mailPort === 465 ? 'on' : 'off')).toLowerCase() === 'on',
     user: process.env.AI_TODO_SMTP_USER?.trim() || '',
-    pass: process.env.AI_TODO_SMTP_PASS ?? '',
+    // 凭据二选一：AI_TODO_SMTP_AUTH_CODE（授权码，推荐）优先于 AI_TODO_SMTP_PASS。
+    // QQ / 163 / Gmail 等云邮箱要求用「授权码」而非登录密码，值里可能含空格，
+    // 统一去掉首尾空白（授权码中间的空格不受影响）。
+    pass: (process.env.AI_TODO_SMTP_AUTH_CODE ?? process.env.AI_TODO_SMTP_PASS ?? '').trim(),
     from: process.env.AI_TODO_SMTP_FROM?.trim() || `AI Todo <${process.env.AI_TODO_SMTP_USER?.trim() || 'no-reply@localhost'}>`,
   };
 
