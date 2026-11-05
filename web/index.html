@@ -95,8 +95,17 @@
             <div class="user-dropdown-role" id="dd-role">—</div>
           </div>
           <button class="user-menu-item" id="dd-account" role="menuitem">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span data-i18n="topbar.accountTokens"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span data-i18n="topbar.accountSettings"></span>
+          </button>
+          <!-- 令牌 / 用户是两个独立界面，不再是设置抽屉里的一段 -->
+          <button class="user-menu-item" id="dd-tokens" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+            <span data-i18n="topbar.tokens"></span>
+          </button>
+          <button class="user-menu-item" id="dd-users" role="menuitem" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span data-i18n="topbar.users"></span>
           </button>
           <button class="user-menu-item is-danger" id="dd-logout" role="menuitem">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
@@ -127,8 +136,8 @@
     </button>
   </div>
 
-  <!-- 工具栏 -->
-  <div class="toolbar">
+  <!-- 工具栏（仅任务列表视图显示） -->
+  <div class="toolbar" id="toolbar">
     <div class="tabs" id="tabs">
       <button class="tab is-active" data-status="pending" data-i18n="tab.pending"></button>
       <button class="tab" data-status="acked" data-i18n="tab.acked"></button>
@@ -152,7 +161,7 @@
   </div>
 
   <!-- 列表 -->
-  <main class="main">
+  <main class="main" id="main-tasks">
     <div class="list" id="list"></div>
     <div class="empty" id="empty" hidden>
       <div class="empty-mark">
@@ -162,6 +171,30 @@
       <p class="empty-sub" data-i18n="empty.sub"></p>
     </div>
   </main>
+
+  <!-- 用户管理（仅管理员）：独立界面，以列表形式管理账号 -->
+  <section class="page" id="page-users" hidden>
+    <div class="page-head">
+      <button class="btn btn-sm btn-quiet" id="btn-users-back" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        <span data-i18n="page.back"></span>
+      </button>
+      <h2 data-i18n="page.usersTitle"></h2>
+    </div>
+    <div class="page-body" id="users-body"></div>
+  </section>
+
+  <!-- 令牌管理：每个用户在自己的界面里签发 / 吊销 MCP 访问令牌 -->
+  <section class="page" id="page-tokens" hidden>
+    <div class="page-head">
+      <button class="btn btn-sm btn-quiet" id="btn-tokens-back" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        <span data-i18n="page.back"></span>
+      </button>
+      <h2 data-i18n="page.tokensTitle"></h2>
+    </div>
+    <div class="page-body" id="tokens-body"></div>
+  </section>
 
   <!-- 新增任务（手动） -->
   <button class="fab" id="btn-add" data-i18n-title="task.addTitle">

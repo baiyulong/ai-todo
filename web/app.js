@@ -16,6 +16,10 @@ const state = {
   es: null,
   drawerMode: null,
   lastToken: null,
+  /** 当前视图：任务列表 / 用户管理 / 令牌管理 */
+  view: 'tasks',
+  /** 最近一次创建账号拿到的初始凭据，只在当前页面显示一次 */
+  freshUserCredentials: null,
   /** 服务端支持的登录方式 */
   wechat: { enabled: false, mode: 'qrconnect', mock: false },
 };
@@ -112,6 +116,8 @@ function renderUser() {
   $('user-avatar').textContent = name.slice(0, 1);
   $('dd-name').textContent = name;
   $('dd-role').textContent = me.is_admin ? t('status.roleAdmin') : t('status.roleUser');
+  // 用户管理是管理员专属入口：不是管理员就直接藏起来
+  $('dd-users').hidden = !me.is_admin;
 }
 
 function setUserMenu(open) {
@@ -140,6 +146,14 @@ $('btn-user').addEventListener('click', (e) => {
 $('dd-account').addEventListener('click', () => {
   closeUserMenu();
   openDrawer('settings');
+});
+$('dd-tokens').addEventListener('click', () => {
+  closeUserMenu();
+  setView('tokens');
+});
+$('dd-users').addEventListener('click', () => {
+  closeUserMenu();
+  setView('users');
 });
 $('dd-logout').addEventListener('click', () => {
   doLogout();
@@ -180,6 +194,8 @@ function enterApp() {
   loginScreen.hidden = true;
   detachLogin();
   $('app').hidden = false;
+  // 上个会话可能停在管理页面里，重新登录一律回到任务列表
+  setView('tasks');
 }
 
 function showLogin() {
@@ -327,7 +343,6 @@ async function startWechatLogin() {
   try {
     const res = await api.get('/api/v1/auth/wechat/start');
     $('login-wechat-panel').hidden = false;
-    $('login-wechat-token').hidden = true;
     $('login-wechat-tip').textContent = t('login.wechatScanTip');
     renderQr($('login-wechat-qr'), res.authorize_url);
     pollWechatStatus(res.state, 'login');
@@ -595,6 +610,9 @@ const BOT_ICON = [
 // 文件夹（Lucide folder）—— 来源项目
 const FOLDER_ICON = ['M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'];
 
+// 下箭头（Lucide chevron-down）—— 卡片可展开的暗示
+const CHEVRON_ICON = ['m6 9 6 6 6-6'];
+
 function renderTasks() {
   const list = $('list');
   list.textContent = '';
@@ -613,6 +631,10 @@ function renderTask(task) {
   if (task.status === 'done') card.classList.add('is-done');
   if (task.status === 'archived') card.classList.add('is-archived');
   if (state.selectedId === task.id) card.classList.add('is-selected');
+
+  // 收起 / 展开状态：收起时只有标题 + 基本信息（级别、状态、来源、时间），
+  // 详情和操作按钮都要点开卡片才看得到——长列表里一屏能多看好几条。
+  const expanded = state.selectedId === task.id;
 
   const top = document.createElement('div');
   top.className = 'task-top';
@@ -649,16 +671,16 @@ function renderTask(task) {
   });
   top.appendChild(del);
 
+  // 展开箭头：告诉用户「这张卡片点开还有内容」，展开时翻转朝上
+  const caret = document.createElement('span');
+  caret.className = 'task-caret';
+  caret.setAttribute('aria-hidden', 'true');
+  caret.appendChild(svgIcon(CHEVRON_ICON));
+  top.appendChild(caret);
+
   card.appendChild(top);
 
-  if (task.detail) {
-    const detail = document.createElement('p');
-    detail.className = 'task-detail';
-    detail.textContent = task.detail;
-    card.appendChild(detail);
-  }
-
-  // 元信息
+  // 元信息（收起状态下也一直可见的基本信息）
   const meta = document.createElement('div');
   meta.className = 'task-meta';
 
@@ -733,21 +755,31 @@ function renderTask(task) {
 
   card.appendChild(meta);
 
-  // 操作
-  const actions = document.createElement('div');
-  actions.className = 'task-actions';
+  // 展开区：详情和操作按钮只在点开卡片后出现
+  if (expanded) {
+    if (task.detail) {
+      const detail = document.createElement('p');
+      detail.className = 'task-detail';
+      detail.textContent = task.detail;
+      card.appendChild(detail);
+    }
 
-  if (task.status === 'pending') {
-    actions.appendChild(actionBtn(t('action.ack'), 'btn', () => setStatus(task.id, 'ack')));
-  }
-  if (task.status !== 'done' && task.status !== 'archived') {
-    actions.appendChild(actionBtn(t('action.done'), 'btn', () => setStatus(task.id, 'done')));
-  }
-  if (task.status === 'pending') {
-    actions.appendChild(actionBtn(t('action.snooze'), 'btn', (btn) => toggleSnooze(task, btn)));
+    const actions = document.createElement('div');
+    actions.className = 'task-actions';
+
+    if (task.status === 'pending') {
+      actions.appendChild(actionBtn(t('action.ack'), 'btn', () => setStatus(task.id, 'ack')));
+    }
+    if (task.status !== 'done' && task.status !== 'archived') {
+      actions.appendChild(actionBtn(t('action.done'), 'btn', () => setStatus(task.id, 'done')));
+    }
+    if (task.status === 'pending') {
+      actions.appendChild(actionBtn(t('action.snooze'), 'btn', (btn) => toggleSnooze(task, btn)));
+    }
+
+    card.appendChild(actions);
   }
 
-  card.appendChild(actions);
   card.addEventListener('click', (e) => {
     if (e.target.closest('button, a')) return;
     selectTask(task.id);
@@ -839,7 +871,11 @@ function formatTime(iso) {
 
 async function setStatus(id, status) {
   try {
-    await api.post(`/api/v1/tasks/${id}/${status === 'acked' ? 'ack' : 'done'}`);
+    // 调用方传的是状态常量 'ack' / 'done'，接口路径同名。
+    // 以前写成 status === 'acked' ? 'ack' : 'done'——'ack' 永远不等于 'acked'，
+    // 点「接手」实际请求的是 done，任务直接被标成完成了。
+    const endpoint = status === 'done' ? 'done' : 'ack';
+    await api.post(`/api/v1/tasks/${id}/${endpoint}`);
     await loadTasks();
     await loadMe();
   } catch (err) {
@@ -931,10 +967,55 @@ function connectStream() {
 }
 
 async function onNotification(payload) {
+  playNotifySound();
   await showDesktopNotification(payload);
   await loadTasks();
   await loadMe();
   renderDrawerIfOpen();
+}
+
+/**
+ * 通知提示音。
+ *
+ * 用 Web Audio 现场合成两声短音（A5 → D6），不引音频文件：
+ * 横幅本身可能被系统吞掉或延迟，声音是独立的提醒通道，得自己保证响。
+ *
+ * 浏览器规定 AudioContext 必须在用户交互之后才能出声——
+ * 登录那一下点击就满足了；万一被挂起就尝试 resume，实在不行静默失败，
+ * 声音缺席不该影响通知本身。
+ */
+let notifyAudioCtx = null;
+
+function playNotifySound() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    notifyAudioCtx = notifyAudioCtx || new Ctx();
+    if (notifyAudioCtx.state === 'suspended') {
+      notifyAudioCtx.resume().catch(() => {});
+    }
+    const now = notifyAudioCtx.currentTime;
+    // 两声上行的「叮咚」：一声太短容易被当成杂音，两声才像提醒
+    const notes = [
+      [880, 0],        // A5
+      [1174.66, 0.14], // D6
+    ];
+    for (const [freq, offset] of notes) {
+      const osc = notifyAudioCtx.createOscillator();
+      const gain = notifyAudioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + offset);
+      gain.gain.linearRampToValueAtTime(0.16, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.42);
+      osc.connect(gain);
+      gain.connect(notifyAudioCtx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.5);
+    }
+  } catch {
+    /* 声音失败不影响通知流程 */
+  }
 }
 
 async function showDesktopNotification(payload) {
@@ -1199,7 +1280,7 @@ function renderDrawerIfOpen() {
   if (state.drawerMode && !$('drawer').hidden) renderDrawer();
 }
 
-async function renderDrawer() {
+function renderDrawer() {
   const body = $('drawer-body');
   body.textContent = '';
   const rules = state.rules || state.me?.rules;
@@ -1278,20 +1359,13 @@ async function renderDrawer() {
   }
   body.appendChild(s2b);
 
-  // 访问令牌（AI 客户端用）
-  const s3 = section(t('section.tokens'));
-  s3.appendChild(hint(t('token.hint')));
-  body.appendChild(s3);
-  body.appendChild(await tokensBlock());
-
-  // MCP 接入
+  // MCP 接入（令牌在独立的「令牌管理」界面里签发）
   const s4 = section(t('section.mcp'));
   s4.appendChild(hint(t('mcp.hint')));
 
   const token = state.lastToken || t('mcp.tokenPlaceholder');
   const httpUrl = `${location.origin}/mcp`;
 
-  // 远程 HTTP：客户端机器什么都不用装，只要一个 URL + 令牌
   s4.appendChild(
     codeBlock(t('mcp.httpTitle'), t('mcp.httpHint'), {
       mcpServers: {
@@ -1303,33 +1377,9 @@ async function renderDrawer() {
     }),
   );
 
-  // stdio：客户端与服务端在同一台机器时用
-  s4.appendChild(
-    codeBlock(t('mcp.stdioTitle'), t('mcp.stdioHint'), {
-      mcpServers: {
-        'ai-todo': {
-          command: 'node',
-          args: [t('mcp.args'), 'mcp'],
-          env: {
-            AI_TODO_BASE_URL: location.origin,
-            AI_TODO_TOKEN: token,
-          },
-        },
-      },
-    }),
-  );
-
   s4.appendChild(hint(t('mcp.isolation')));
   s4.appendChild(hint(t('mcp.sourceHint')));
   body.appendChild(s4);
-
-  // 用户管理（仅管理员）
-  if (state.me?.is_admin) {
-    const s5 = section(t('section.users'));
-    s5.appendChild(hint(t('user.hint')));
-    body.appendChild(s5);
-    body.appendChild(await usersBlock());
-  }
 
   // 快捷键
   const s6 = section(t('section.shortcuts'));
@@ -1340,67 +1390,273 @@ async function renderDrawer() {
   body.appendChild(s6);
 }
 
-/* ---------------------------------------------------------------- 访问令牌 */
+/* ---------------------------------------------------------------- 视图切换 */
 
-async function tokensBlock() {
-  const frag = document.createDocumentFragment();
+/**
+ * 主区域视图切换：任务列表 / 用户管理 / 令牌管理。
+ *
+ * 用户管理与令牌管理是独立的整页界面，不再是设置抽屉里挤在一起的一段——
+ * 账号一多，抽屉里那个窄条既放不下列表也看不清操作。
+ */
+function setView(view) {
+  state.view = view;
+  const isTasks = view === 'tasks';
+  $('toolbar').hidden = !isTasks;
+  $('main-tasks').hidden = !isTasks;
+  $('btn-add').hidden = !isTasks;
+  $('page-users').hidden = view !== 'users';
+  $('page-tokens').hidden = view !== 'tokens';
+  if (view === 'users') renderUsersPage();
+  if (view === 'tokens') renderTokensPage();
+}
 
-  let tokens = [];
-  try {
-    const res = await api.get('/api/v1/tokens');
-    tokens = res.tokens || [];
-  } catch (err) {
-    frag.appendChild(hint(t('token.loadFailed', { message: translateError(err) })));
-    return frag;
-  }
+$('btn-users-back').addEventListener('click', () => setView('tasks'));
+$('btn-tokens-back').addEventListener('click', () => setView('tasks'));
 
-  if (tokens.length === 0) {
-    frag.appendChild(hint(t('token.empty')));
-  } else {
-    // 循环变量不能叫 t——那是本模块的翻译函数
-    for (const tk of tokens) {
-      const row = document.createElement('div');
-      row.className = 'token-row';
+/* ---------------------------------------------------------------- 用户管理（独立界面） */
 
-      const info = document.createElement('div');
-      info.className = 'token-info';
-      const name = document.createElement('div');
-      name.className = 'token-name';
-      name.textContent = tk.name;
-      const meta = document.createElement('div');
-      meta.className = 'token-meta';
-      const used = tk.last_used_at
-        ? t('token.lastUsed', { time: formatTime(tk.last_used_at) })
-        : t('token.neverUsed');
-      meta.textContent = `${tk.revoked_at ? t('token.revoked') : t('token.valid')} · ${used}`;
-      info.appendChild(name);
-      info.appendChild(meta);
-      row.appendChild(info);
+function renderUsersPage() {
+  const body = $('users-body');
+  body.textContent = '';
 
-      if (!tk.revoked_at) {
-        const revoke = document.createElement('button');
-        revoke.className = 'btn btn-sm btn-quiet btn-danger';
-        revoke.textContent = t('token.revoke');
-        revoke.addEventListener('click', async () => {
-          try {
-            await api.del(`/api/v1/tokens/${tk.id}`);
-            toast(t('token.revokedToast'));
-            renderDrawer();
-          } catch (err) {
-            toast(translateError(err), true);
-          }
-        });
-        row.appendChild(revoke);
-      }
+  // 新建账号
+  const createCard = document.createElement('div');
+  createCard.className = 'mgmt-card';
+  const createHead = document.createElement('h3');
+  createHead.className = 'mgmt-card-title';
+  createHead.textContent = t('user.newTitle');
+  createCard.appendChild(createHead);
+  createCard.appendChild(hint(t('user.hint')));
 
-      frag.appendChild(row);
+  const createRow = document.createElement('div');
+  createRow.className = 'mgmt-create-row';
+  const uname = document.createElement('input');
+  uname.className = 'input';
+  uname.placeholder = t('user.newUsernamePlaceholder');
+  uname.maxLength = 32;
+  uname.autocapitalize = 'off';
+  uname.spellcheck = false;
+  const create = document.createElement('button');
+  create.className = 'btn btn-primary';
+  create.textContent = t('user.create');
+  create.addEventListener('click', async () => {
+    const username = uname.value.trim().toLowerCase();
+    if (!username) { toast(t('user.needUsername'), true); return; }
+    try {
+      const res = await api.post('/api/v1/admin/users', { username });
+      uname.value = '';
+      // 初始密码与令牌只显示一次：摊开在页面里，复制按钮伺候
+      state.freshUserCredentials = { username: res.user.username, password: res.password, token: res.token };
+      if (res.token) state.lastToken = res.token;
+      toast(t('user.createdToast', { username: res.user.username }));
+      renderUsersPage();
+    } catch (err) {
+      toast(translateError(err), true);
     }
+  });
+  createRow.appendChild(uname);
+  createRow.appendChild(create);
+  createCard.appendChild(createRow);
+  body.appendChild(createCard);
+
+  // 刚创建的账号凭据（只显示这一次）
+  if (state.freshUserCredentials) {
+    body.appendChild(credentialsCard(state.freshUserCredentials));
   }
+
+  // 用户列表
+  const listCard = document.createElement('div');
+  listCard.className = 'mgmt-card';
+  const listHead = document.createElement('h3');
+  listHead.className = 'mgmt-card-title';
+  listHead.textContent = t('user.listTitle');
+  listCard.appendChild(listHead);
+
+  let users = [];
+  try {
+    // 同步函数里发请求拿不到结果——先渲染骨架，数据回来再重画
+    api.get('/api/v1/admin/users').then((res) => {
+      users = res.users || [];
+      fillUserTable(listCard, users);
+    }).catch((err) => {
+      listCard.appendChild(hint(t('user.loadFailed', { message: translateError(err) })));
+    });
+  } catch (err) {
+    listCard.appendChild(hint(t('user.loadFailed', { message: translateError(err) })));
+  }
+
+  const head = userTableRow(true);
+  head.className = 'mgmt-row mgmt-row-head';
+  listCard.appendChild(head);
+  body.appendChild(listCard);
+}
+
+function fillUserTable(listCard, users) {
+  // 表头和数据行分两次画：列表主体要在不重画整个页面的情况下更新
+  listCard.querySelectorAll('.mgmt-row:not(.mgmt-row-head)').forEach((r) => r.remove());
+  for (const u of users) {
+    listCard.appendChild(userTableRow(false, u));
+  }
+  if (users.length === 0) {
+    listCard.appendChild(hint(t('user.empty')));
+  }
+}
+
+/**
+ * 用户表格的一行（或表头）。
+ * 列：用户名 / 角色 / 状态 / 操作。
+ */
+function userTableRow(isHead, u) {
+  const row = document.createElement('div');
+  row.className = 'mgmt-row';
+
+  const cellUser = document.createElement('div');
+  const cellRole = document.createElement('div');
+  const cellStatus = document.createElement('div');
+  const cellActions = document.createElement('div');
+
+  if (isHead) {
+    cellUser.textContent = t('user.colUsername');
+    cellRole.textContent = t('user.colRole');
+    cellStatus.textContent = t('user.colStatus');
+    cellActions.textContent = t('user.colActions');
+    row.append(cellUser, cellRole, cellStatus, cellActions);
+    return row;
+  }
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'mgmt-name';
+  nameSpan.textContent = u.username || t('user.noUsername');
+  cellUser.appendChild(nameSpan);
+  if (u.display_name) {
+    const dn = document.createElement('span');
+    dn.className = 'mgmt-sub';
+    dn.textContent = u.display_name;
+    cellUser.appendChild(dn);
+  }
+  if (state.me && u.id === state.me.id) {
+    const you = document.createElement('span');
+    you.className = 'mgmt-sub';
+    you.textContent = t('user.self');
+    cellUser.appendChild(you);
+  }
+
+  cellRole.textContent = u.is_admin ? t('status.roleAdmin') : t('status.roleUser');
+  if (u.is_admin) cellRole.classList.add('mgmt-role-admin');
+
+  const status = document.createElement('span');
+  status.className = 'tag ' + (u.is_active ? 'st-acked' : 'sev-blocker');
+  status.textContent = u.is_active ? t('user.flagNormal') : t('user.flagDisabled');
+  cellStatus.appendChild(status);
+  if (u.wechat_openid) {
+    const wx = document.createElement('span');
+    wx.className = 'mgmt-sub';
+    wx.textContent = t('user.flagWechat');
+    cellStatus.appendChild(wx);
+  }
+
+  // 不能禁用 / 启用自己：把自己禁了就只能去改数据库了
+  const isSelf = state.me && u.id === state.me.id;
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = u.is_active ? 'btn btn-sm btn-quiet btn-danger' : 'btn btn-sm btn-quiet';
+  toggle.textContent = u.is_active ? t('user.disable') : t('user.enable');
+  if (isSelf) {
+    toggle.disabled = true;
+    toggle.title = t('user.selfToggleHint');
+  }
+  toggle.addEventListener('click', async () => {
+    try {
+      await api.patch(`/api/v1/admin/users/${u.id}`, { is_active: !u.is_active });
+      toast(u.is_active ? t('user.disabledToast') : t('user.enabledToast'));
+      renderUsersPage();
+    } catch (err) {
+      toast(translateError(err), true);
+    }
+  });
+  cellActions.appendChild(toggle);
+
+  row.append(cellUser, cellRole, cellStatus, cellActions);
+  return row;
+}
+
+/** 新建账号后的一次性凭据卡：初始密码 + MCP 令牌，各带复制按钮 */
+function credentialsCard(creds) {
+  const card = document.createElement('div');
+  card.className = 'mgmt-card token-secret credentials-card';
+
+  const label = document.createElement('div');
+  label.className = 'token-secret-label';
+  label.textContent = t('user.createdFor', { username: creds.username });
+  card.appendChild(label);
+
+  const passLabel = document.createElement('div');
+  passLabel.className = 'cred-label';
+  passLabel.textContent = t('user.createdPassword');
+  card.appendChild(passLabel);
+
+  card.appendChild(secretRow(creds.password));
+
+  if (creds.token) {
+    const tokenLabel = document.createElement('div');
+    tokenLabel.className = 'cred-label';
+    tokenLabel.textContent = t('user.createdTokenLabel');
+    card.appendChild(tokenLabel);
+    card.appendChild(secretRow(creds.token));
+  }
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'btn btn-sm btn-quiet';
+  close.textContent = t('user.credentialDismiss');
+  close.style.marginTop = '4px';
+  close.addEventListener('click', () => {
+    state.freshUserCredentials = null;
+    renderUsersPage();
+  });
+  card.appendChild(close);
+
+  return card;
+}
+
+/** 密文 + 复制按钮的一行 */
+function secretRow(value) {
+  const row = document.createElement('div');
+  row.className = 'qr-token-row';
+  const code = document.createElement('code');
+  code.textContent = value;
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn-sm';
+  copy.textContent = t('token.copy');
+  copy.addEventListener('click', async () => {
+    const ok = await copyText(value);
+    toast(ok ? t('token.copiedToast') : t('token.copyFailedToast'), !ok);
+  });
+  row.appendChild(code);
+  row.appendChild(copy);
+  return row;
+}
+
+/* ---------------------------------------------------------------- 令牌管理（独立界面） */
+
+function renderTokensPage() {
+  const body = $('tokens-body');
+  body.textContent = '';
+
+  const card = document.createElement('div');
+  card.className = 'mgmt-card';
+  card.appendChild(hint(t('token.hint')));
+
+  const listWrap = document.createElement('div');
+  listWrap.id = 'tokens-list';
+  card.appendChild(listWrap);
 
   const nameInput = document.createElement('input');
   nameInput.className = 'input';
   nameInput.placeholder = t('token.namePlaceholder');
   nameInput.maxLength = 120;
+  nameInput.style.marginTop = '14px';
 
   const issue = document.createElement('button');
   issue.className = 'btn btn-primary btn-block';
@@ -1412,58 +1668,44 @@ async function tokensBlock() {
       state.lastToken = res.token;
       nameInput.value = '';
       toast(t('token.issuedToast'));
-      renderDrawer();
+      renderTokensPage();
     } catch (err) {
       toast(translateError(err), true);
     }
   });
 
-  frag.appendChild(nameInput);
-  frag.appendChild(issue);
+  card.appendChild(nameInput);
+  card.appendChild(issue);
+  body.appendChild(card);
 
+  // 刚签发的令牌（只显示这一次）
   if (state.lastToken) {
     const box = document.createElement('div');
-    box.className = 'token-secret';
+    box.className = 'mgmt-card token-secret';
     const label = document.createElement('div');
     label.className = 'token-secret-label';
     label.textContent = t('token.freshLabel');
-    const code = document.createElement('code');
-    code.textContent = state.lastToken;
-    const copy = document.createElement('button');
-    copy.className = 'btn btn-sm';
-    copy.textContent = t('token.copy');
-    copy.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(state.lastToken);
-        toast(t('token.copiedToast'));
-      } catch {
-        toast(t('token.copyFailedToast'), true);
-      }
-    });
     box.appendChild(label);
-    box.appendChild(code);
-    box.appendChild(copy);
-    frag.appendChild(box);
+    box.appendChild(secretRow(state.lastToken));
+    body.appendChild(box);
   }
 
-  return frag;
+  // 令牌列表：数据到了再填进 listWrap
+  api.get('/api/v1/tokens').then((res) => {
+    fillTokenList(listWrap, res.tokens || []);
+  }).catch((err) => {
+    listWrap.appendChild(hint(t('token.loadFailed', { message: translateError(err) })));
+  });
 }
 
-/* ---------------------------------------------------------------- 用户管理 */
-
-async function usersBlock() {
-  const frag = document.createDocumentFragment();
-
-  let users = [];
-  try {
-    const res = await api.get('/api/v1/admin/users');
-    users = res.users || [];
-  } catch (err) {
-    frag.appendChild(hint(t('user.loadFailed', { message: translateError(err) })));
-    return frag;
+function fillTokenList(wrap, tokens) {
+  wrap.textContent = '';
+  if (tokens.length === 0) {
+    wrap.appendChild(hint(t('token.empty')));
+    return;
   }
-
-  for (const u of users) {
+  // 循环变量不能叫 t——那是本模块的翻译函数
+  for (const tk of tokens) {
     const row = document.createElement('div');
     row.className = 'token-row';
 
@@ -1471,65 +1713,35 @@ async function usersBlock() {
     info.className = 'token-info';
     const name = document.createElement('div');
     name.className = 'token-name';
-    name.textContent = (u.username || t('user.noUsername')) + (u.display_name ? ` · ${u.display_name}` : '');
+    name.textContent = tk.name;
     const meta = document.createElement('div');
     meta.className = 'token-meta';
-    const flags = [];
-    if (u.is_admin) flags.push(t('user.flagAdmin'));
-    if (!u.is_active) flags.push(t('user.flagDisabled'));
-    if (u.wechat_openid) flags.push(t('user.flagWechat'));
-    meta.textContent = flags.length ? flags.join(' · ') : t('user.flagNormal');
+    const used = tk.last_used_at
+      ? t('token.lastUsed', { time: formatTime(tk.last_used_at) })
+      : t('token.neverUsed');
+    meta.textContent = `${tk.revoked_at ? t('token.revoked') : t('token.valid')} · ${used}`;
     info.appendChild(name);
     info.appendChild(meta);
     row.appendChild(info);
 
-    const toggle = document.createElement('button');
-    // 「禁用」是破坏性动作，悬停时给警示色；「启用」是恢复动作，保持中性
-    toggle.className = u.is_active ? 'btn btn-sm btn-quiet btn-danger' : 'btn btn-sm btn-quiet';
-    toggle.textContent = u.is_active ? t('user.disable') : t('user.enable');
-    toggle.addEventListener('click', async () => {
-      try {
-        await api.patch(`/api/v1/admin/users/${u.id}`, { is_active: !u.is_active });
-        toast(u.is_active ? t('user.disabledToast') : t('user.enabledToast'));
-        renderDrawer();
-      } catch (err) {
-        toast(translateError(err), true);
-      }
-    });
-    row.appendChild(toggle);
-
-    frag.appendChild(row);
-  }
-
-  const uname = document.createElement('input');
-  uname.className = 'input';
-  uname.placeholder = t('user.newUsernamePlaceholder');
-  uname.maxLength = 32;
-  uname.autocapitalize = 'off';
-  uname.spellcheck = false;
-
-  const create = document.createElement('button');
-  create.className = 'btn btn-primary btn-block';
-  create.textContent = t('user.create');
-  create.style.marginTop = '10px';
-  create.addEventListener('click', async () => {
-    const username = uname.value.trim().toLowerCase();
-    if (!username) { toast(t('user.needUsername'), true); return; }
-    try {
-      const res = await api.post('/api/v1/admin/users', { username });
-      state.lastToken = res.token;
-      uname.value = '';
-      toast(t('user.createdToast', { username: res.user.username }));
-      renderDrawer();
-    } catch (err) {
-      toast(translateError(err), true);
+    if (!tk.revoked_at) {
+      const revoke = document.createElement('button');
+      revoke.className = 'btn btn-sm btn-quiet btn-danger';
+      revoke.textContent = t('token.revoke');
+      revoke.addEventListener('click', async () => {
+        try {
+          await api.del(`/api/v1/tokens/${tk.id}`);
+          toast(t('token.revokedToast'));
+          renderTokensPage();
+        } catch (err) {
+          toast(translateError(err), true);
+        }
+      });
+      row.appendChild(revoke);
     }
-  });
 
-  frag.appendChild(uname);
-  frag.appendChild(create);
-
-  return frag;
+    wrap.appendChild(row);
+  }
 }
 
 function rulesForm(rules) {
@@ -1788,7 +2000,12 @@ document.addEventListener('keydown', (e) => {
       closeUserMenu();
       return;
     }
-    if (!$('drawer').hidden) closeDrawer();
+    if (!$('drawer').hidden) {
+      closeDrawer();
+      return;
+    }
+    // 管理界面里按 Esc 也能回到任务列表，不用非得去点返回按钮
+    if (state.view !== 'tasks') setView('tasks');
     return;
   }
   if (!$('app') || $('app').hidden) return;

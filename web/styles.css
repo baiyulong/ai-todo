@@ -702,6 +702,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   border-radius: var(--radius);
   padding: 13px 15px 13px 17px;
   box-shadow: var(--shadow-sm);
+  cursor: pointer;
   transition: box-shadow 0.18s ease, transform 0.12s ease, border-color 0.18s ease;
 }
 .task:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
@@ -768,6 +769,23 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* 已归档任务的「彻底删除」：红色常驻一点，免得在一堆灰色卡片里看不出区别 */
 .task-del.is-hard { color: var(--danger); }
 .task-del.is-hard:hover { background: var(--danger-soft); }
+
+/* 展开箭头：收起时朝下，展开时翻转朝上 */
+.task-caret {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px -3px 0 0;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+}
+.task-caret svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.16s ease;
+}
+.task.is-selected .task-caret svg { transform: rotate(180deg); }
 
 /* 有鼠标的设备：默认藏起来，hover / 键盘聚焦时才出现 */
 @media (hover: hover) {
@@ -1088,6 +1106,97 @@ button.src-chip:hover { border-color: var(--accent); }
 .badge-ok { color: #17b26a; }
 .badge-warn { color: var(--warn); }
 .badge-bad { color: var(--danger); }
+
+/* ---------------- 独立管理页面（用户管理 / 令牌管理） ---------------- */
+
+.page {
+  flex: 1;
+  padding: 4px 20px 60px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0 14px;
+}
+.page-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.page-head .btn svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 2px; }
+
+.page-body { display: flex; flex-direction: column; gap: 14px; }
+
+.mgmt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 16px 18px;
+}
+.mgmt-card-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mgmt-card .hint { margin: 0 0 12px; }
+
+.mgmt-create-row {
+  display: flex;
+  gap: 10px;
+}
+.mgmt-create-row .input { flex: 1; }
+.mgmt-create-row .btn { flex: none; white-space: nowrap; }
+
+/* 列表形式的账号表：用户名 / 角色 / 状态 / 操作 */
+.mgmt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(0, 1.1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.mgmt-row:last-of-type { border-bottom: none; }
+.mgmt-row > div { min-width: 0; }
+.mgmt-row-head {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 4px 0 8px;
+}
+.mgmt-row-head:not(:first-child) { border-bottom: 1px solid var(--border); }
+.mgmt-row + .mgmt-row-head { border-top: 1px solid var(--border); margin-top: 4px; }
+
+.mgmt-name { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mgmt-sub { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.mgmt-role-admin { color: var(--accent); font-weight: 500; }
+
+/* 初始凭据卡里的字段小标题 */
+.cred-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin: 10px 0 6px;
+}
+.credentials-card .qr-token-row { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .page { padding: 4px 14px 60px; }
+  .mgmt-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; }
+  /* 窄屏把「角色」列藏掉，状态里已含禁用信息 */
+  .mgmt-row > div:nth-child(2) { display: none; }
+}
 
 /* ---------------- 对话框 ---------------- */
 
