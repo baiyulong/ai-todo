@@ -115,6 +115,16 @@
   border-radius: var(--radius);
 }
 
+/* 表单控件与按钮同样统一小圆角（base/components 里硬编码的 10px/胶囊） */
+[data-theme='hacker'] .btn,
+[data-theme='hacker'] .input,
+[data-theme='hacker'] .select,
+[data-theme='hacker'] textarea.input,
+[data-theme='hacker'] .pending-pill,
+[data-theme='hacker'] .user-chip {
+  border-radius: var(--radius);
+}
+
 [data-theme='hacker'] .task { box-shadow: none; }
 [data-theme='hacker'] .task:hover { box-shadow: 0 0 10px rgba(51, 255, 102, 0.15); }
 [data-theme='hacker'] .task.is-selected { box-shadow: 0 0 14px rgba(51, 255, 102, 0.25); }
