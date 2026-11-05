@@ -1,13 +1,23 @@
-/* 工程纸主题专属动态效果：秋风卷落叶（点击触发）。
- * 左下角有一块看不见的热区，点一下起一阵风——
- * 大卷风线贴着屏幕底部扫过，几片秋叶翻滚着飘过。
- * 没有纸角、不自动吹风；纯装饰、不挡交互；尊重系统的 prefers-reduced-motion。 */
-
-import { t } from '../i18n.js';
+/* 工程纸主题专属动态效果：秋风卷落叶（点击左下角触发）。
+ *
+ * 不再放拦截点击的热区元素——那会挡住滚动到左下角的表单控件
+ * （转交下拉、回复框都点不动）。改用 document 捕获阶段监听：
+ * 点击落在左下角三角区域、且目标不是任何可交互元素时才起一阵风，
+ * 其余点击原样穿透，原生控件行为不受影响。
+ * 大卷风线贴着屏幕底部扫过，几片秋叶翻滚着飘过；
+ * 纯装饰；尊重系统的 prefers-reduced-motion。 */
 
 let layer = null;
 let timers = [];
-let hotspot = null;
+let onDocClick = null;
+let onDocMove = null;
+
+/** 左下角触发区边长（px），斜边为直线 x + y = viewport 高度 */
+const CORNER = 150;
+
+/** 命中这些元素及其子元素时不触发起风，让点击走原生行为 */
+const INTERACTIVE_SELECTOR =
+  'select, input, textarea, button, a, label, [contenteditable], dialog, .user-menu, .drawer, .modal';
 
 export function paperFxEnabled() {
   return typeof matchMedia === 'function' && !matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -64,25 +74,52 @@ function gust() {
   for (let i = 0; i < leaves; i++) later(spawnLeaf, 300 + i * (180 + Math.random() * 300));
 }
 
+function inCornerTriangle(x, y) {
+  const vh = window.innerHeight;
+  return x >= 0 && y >= vh - CORNER && x + y <= vh;
+}
+
+function isInteractiveTarget(target) {
+  return !!(target instanceof Element && target.closest(INTERACTIVE_SELECTOR));
+}
+
 export function startPaperFx() {
   stopPaperFx();
   if (!paperFxEnabled()) return;
   layer = document.createElement('div');
   layer.className = 'paper-fx-layer';
-  hotspot = document.createElement('span');
-  hotspot.className = 'paper-wind-hotspot';
-  hotspot.title = t('fx.paperCornerHint');
-  hotspot.addEventListener('click', gust);
-  layer.appendChild(hotspot);
   document.body.appendChild(layer);
+
+  onDocClick = (e) => {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (isInteractiveTarget(e.target)) return;
+    // 正在拖选文字的点击不抢戏
+    const sel = window.getSelection?.();
+    if (sel && String(sel).length > 0) return;
+    if (inCornerTriangle(e.clientX, e.clientY)) gust();
+  };
+  document.addEventListener('click', onDocClick, true);
+
+  // 悬停在可触发区域时给 pointer 光标提示（纯光标变化，不拦截任何事件）
+  onDocMove = (e) => {
+    const hot = inCornerTriangle(e.clientX, e.clientY) && !isInteractiveTarget(e.target);
+    document.body.style.cursor = hot ? 'pointer' : '';
+  };
+  document.addEventListener('mousemove', onDocMove);
 }
 
 export function stopPaperFx() {
   for (const id of timers) clearTimeout(id);
   timers = [];
+  if (onDocClick) document.removeEventListener('click', onDocClick, true);
+  if (onDocMove) {
+    document.removeEventListener('mousemove', onDocMove);
+    document.body.style.cursor = '';
+  }
+  onDocClick = null;
+  onDocMove = null;
   if (layer) {
     layer.remove();
     layer = null;
   }
-  hotspot = null;
 }

@@ -400,9 +400,15 @@ button.src-chip:hover { border-color: var(--accent); color: var(--accent); }
 .task-reply-head { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
 .task-reply-body { font-size: 13px; white-space: pre-wrap; word-break: break-word; }
 
-/* 回复输入行：任务未完成时展开区底部 */
-.task-reply-row { display: flex; gap: 8px; margin-top: 10px; }
-.task-reply-row .input { flex: 1; min-width: 0; }
+/* 回复输入行：任务未完成时展开区底部（多行文本框） */
+.task-reply-row { display: flex; gap: 8px; margin-top: 10px; align-items: flex-start; }
+.task-reply-row .input {
+  flex: 1;
+  min-width: 0;
+  min-height: 72px;
+  resize: vertical;
+  line-height: 1.5;
+}
 .task-reply-row .btn { flex: none; }
 
 .snooze-row { margin-top: 8px; }

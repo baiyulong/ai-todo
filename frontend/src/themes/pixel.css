@@ -323,15 +323,6 @@
   100% { transform: rotate(680deg) translateX(0); }
 }
 
-/* 左下角热区：看不见的一块三角，点一下起一阵风。
-   clip-path 同时裁掉了可点区域：只有三角形内接得住点击，其余穿透。 */
-[data-theme='pixel'] .paper-wind-hotspot {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 150px;
-  height: 150px;
-  clip-path: polygon(0 0, 0 100%, 100% 100%);
-  pointer-events: auto;
-  cursor: pointer;
-}
+/* 左下角触发不再用热区元素（会挡住滚到左下角的表单控件），
+   改由 paperFx.js 在 document 捕获阶段判定：点空白三角区起风，
+   表单控件/链接的点击原样穿透。 */

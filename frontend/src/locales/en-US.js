@@ -96,6 +96,7 @@ export const dict = {
   'task.transferPlaceholder': 'Hand off to…',
   'task.transferPick': 'Pick a person first',
   'task.transferredToast': 'Handed off to {user} — they have been notified',
+  'task.transferDisabledHint': 'You are the only user — nobody to hand off to',
   'task.replyLabel': 'Your reply',
   'task.replyPlaceholder': 'Reply to this task — it is marked done and the waiting AI receives it right away',
   'task.reply': 'Reply',
@@ -249,7 +250,7 @@ export const dict = {
   'project.deletedToast': 'Project deleted',
 
   // ---------------- Theme FX ----------------
-  'fx.paperCornerHint': 'Click for a gust of wind',
+
 
   // ---------------- MCP ----------------
   'mcp.hint': 'Paste this into your AI client’s MCP configuration (MCode / Claude Code / Cursor / Trae) and the AI can push finished tasks to you.',

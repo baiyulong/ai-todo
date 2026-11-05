@@ -96,6 +96,7 @@ export const dict = {
   'task.transferPlaceholder': '转给谁…',
   'task.transferPick': '请先选择转交目标',
   'task.transferredToast': '已转交给 {user}，对方会收到通知',
+  'task.transferDisabledHint': '当前只有你一个用户，没有可转交的对象',
   'task.replyLabel': '我的回复',
   'task.replyPlaceholder': '回复这个任务——回复后任务完成，正在等待的 AI 会立刻收到',
   'task.reply': '回复',
@@ -249,7 +250,7 @@ export const dict = {
   'project.deletedToast': '项目已删除',
 
   // ---------------- 主题动效 ----------------
-  'fx.paperCornerHint': '点一下，起一阵风',
+
 
   // ---------------- MCP ----------------
   'mcp.hint': '把下面这段加到你的 AI 客户端（MCode / Claude Code / Cursor / Trae）的 MCP 配置里，AI 就能把完成的任务推进来。',

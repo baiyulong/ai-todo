@@ -211,7 +211,13 @@ async function doReply() {
 
         <!-- 转交：选人 + 转交按钮。目标用户会收到站内通知和邮件。 -->
         <span v-if="task.status === 'pending' || task.status === 'acked'" class="task-transfer">
-          <select v-model="transferTo" class="select" :aria-label="t('task.transferLabel')" :disabled="transferDisabled">
+          <select
+            v-model="transferTo"
+            class="select"
+            :aria-label="t('task.transferLabel')"
+            :disabled="transferDisabled"
+            :title="transferDisabled ? t('task.transferDisabledHint') : undefined"
+          >
             <option value="">{{ t('task.transferPlaceholder') }}</option>
             <option v-for="u in transferTargets" :key="u.id" :value="u.id">{{ targetLabel(u) }}</option>
           </select>
@@ -232,17 +238,18 @@ async function doReply() {
         >{{ label }}</button>
       </div>
 
-      <!-- 回复输入：任务还没完成时可以回复；回复后任务标记完成，等待中的 AI 会立刻收到 -->
+      <!-- 回复输入：多行文本框，Ctrl/Cmd+Enter 或按钮提交；回复后任务标记完成，等待中的 AI 会立刻收到 -->
       <div v-if="task.status === 'pending' || task.status === 'acked'" class="task-reply-row">
-        <input
+        <textarea
           v-model="replyText"
           class="input"
-          type="text"
+          rows="3"
           maxlength="8000"
           :placeholder="t('task.replyPlaceholder')"
           :aria-label="t('task.replyLabel')"
-          @keydown.enter.prevent="doReply"
-        >
+          @keydown.ctrl.enter.prevent="doReply"
+          @keydown.meta.enter.prevent="doReply"
+        ></textarea>
         <button class="btn btn-primary" type="button" :disabled="!replyText.trim()" @click="doReply">
           {{ t('task.reply') }}
         </button>
