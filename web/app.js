@@ -1424,11 +1424,6 @@ function renderDrawer() {
   }
   body.appendChild(s1);
 
-  // 账号
-  const s2 = section(t('section.account'));
-  s2.appendChild(statusRow(t('status.username'), state.me?.username ?? '—', 'ok'));
-  s2.appendChild(statusRow(t('status.role'), state.me?.is_admin ? t('status.roleAdmin') : t('status.roleUser'), state.me?.is_admin ? 'ok' : ''));
-
   // 微信绑定：已登录的账号可以把自己的微信挂上来，之后就能直接扫码登录
   if (state.wechat.enabled) {
     const s2w = section(t('section.wechat'));
@@ -1450,15 +1445,7 @@ function renderDrawer() {
     body.appendChild(s2w);
   }
 
-  const logout = document.createElement('button');
-  logout.className = 'btn btn-block';
-  logout.textContent = t('topbar.logout');
-  logout.style.marginTop = '10px';
-  logout.addEventListener('click', () => {
-    doLogout();
-  });
-  s2.appendChild(logout);
-  body.appendChild(s2);
+  // 账号信息在顶栏头像下拉里，退出也走那里；设置里不再重复
 
   // 修改密码：微信-only 账号（没设过密码）第一次是「设置密码」，不用填旧密码
   if (state.me) {
