@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
@@ -8,9 +8,10 @@ import { z } from 'zod';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import { TaskService } from '../domain/tasks.js';
-import type { GroupBy, TaskSeverity, TaskStatus } from '../domain/types.js';
+import type { GroupBy, Task, TaskSeverity, TaskStatus } from '../domain/types.js';
 import { UserService, isValidUsername } from '../domain/users.js';
 import { generatePassword } from '../domain/passwords.js';
+import { createMailer, type Mailer } from '../mail/mailer.js';
 import { NotificationBus } from '../notify/bus.js';
 import type { NotificationOrchestrator } from '../notify/orchestrator.js';
 import {
@@ -160,6 +161,16 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   });
 
   const authenticate = createAuthenticator(db, config.cookieName);
+  const mailer = createMailer(config.mail);
+  if (config.mail.enabled) {
+    // 启动时探一次 SMTP 连通性：配错了凭据能在日志里立刻看到，而不是等第一封邮件失败
+    mailer
+      .verify()
+      .then((ok) => {
+        if (ok) console.log('[mail] SMTP 已就绪');
+      })
+      .catch(() => {});
+  }
 
   /**
    * 路径参数里的 :id 一律是 UUID（tasks / api_tokens / users / notifications）。
@@ -185,6 +196,62 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
   // 鉴权 + 参数前置校验。所有用户级接口统一用这一串，保证 401 早于 400。
   const authHooks = [authenticate, ensureUuidParam];
+
+  // ---------------------------------------------------------------- 邮件辅助
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const EMAIL_CODE_TTL_MS = 15 * 60 * 1000;
+
+  const SEVERITY_LABEL: Record<TaskSeverity, string> = {
+    blocker: '阻塞',
+    need_human: '需处理',
+    info: '记录',
+  };
+
+  /** 任务邮件的统一内容（纯文本 + 简单 HTML，二者内容一致） */
+  function taskMailContent(
+    task: Task,
+    opts: { headline: string; extra?: string },
+  ): { subject: string; text: string; html: string } {
+    const url = `${config.baseUrl}/t/${task.id}`;
+    const lines = [
+      opts.headline,
+      `级别：${SEVERITY_LABEL[task.severity]}`,
+      task.project ? `项目：${task.project}` : null,
+      task.detail ? `详情：\n${task.detail}` : null,
+      opts.extra ?? null,
+      `查看任务：${url}`,
+    ].filter((l): l is string => l !== null);
+    const text = lines.join('\n');
+    const html = `<div style="font-family:sans-serif;font-size:14px;line-height:1.7">
+  <p style="font-size:15px;font-weight:600;margin:0 0 8px">${escapeHtml(task.title)}</p>
+  <p style="margin:0 0 6px;color:#555">${escapeHtml(opts.headline)} · 级别 ${SEVERITY_LABEL[task.severity]}${task.project ? ` · 项目 ${escapeHtml(task.project)}` : ''}</p>
+  ${task.detail ? `<p style="white-space:pre-wrap;margin:0 0 6px;color:#333">${escapeHtml(task.detail)}</p>` : ''}
+  ${opts.extra ? `<p style="color:#555;margin:0 0 6px">${escapeHtml(opts.extra)}</p>` : ''}
+  <p style="margin:12px 0 0"><a href="${url}">打开 AI Todo 查看任务</a></p>
+</div>`;
+    return { subject: `[AI Todo] ${task.title}`, text, html };
+  }
+
+  function escapeHtml(s: string): string {
+    return s
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+  }
+
+  /** 给指定用户发任务邮件（没有绑定邮箱就跳过；mailer 内部吞 SMTP 错误） */
+  async function sendTaskMailTo(
+    userId: string,
+    task: Task,
+    opts: { headline: string; extra?: string },
+  ): Promise<void> {
+    const user = await users.findById(userId);
+    if (!user?.email) return;
+    const mail = taskMailContent(task, opts);
+    await mailer.send({ to: user.email, subject: mail.subject, text: mail.text, html: mail.html });
+  }
 
   app.setErrorHandler((error: Error & { validation?: unknown; statusCode?: number }, _req, reply) => {
     if (error.validation) {
@@ -465,6 +532,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     const body = z
       .object({
         username: z.string().min(3).max(32),
+        // 账号必须绑定邮箱：建号时就收齐，任务邮件 / 转交通知都靠它
+        email: z.string().trim().toLowerCase().email().max(200),
         password: z.string().min(8).max(200).optional(),
         display_name: z.string().max(120).optional(),
         is_admin: z.boolean().optional(),
@@ -481,6 +550,11 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
         error: { code: 'invalid_argument', message: '用户名只允许 3–32 位小写字母、数字、. _ -' },
       });
     }
+    if (!EMAIL_RE.test(body.data.email)) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'invalid_argument', message: '请输入合法的邮箱地址' } });
+    }
 
     // 不指定密码就随机生成，初始密码只显示这一次
     const password = body.data.password ?? generatePassword(20);
@@ -491,6 +565,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
         password,
         displayName: body.data.display_name ?? null,
         isAdmin: body.data.is_admin ?? false,
+        email: body.data.email,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -527,6 +602,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
           is_admin: z.boolean().optional(),
           password: z.string().min(8).max(200).optional(),
           display_name: z.string().max(120).nullable().optional(),
+          email: z.string().trim().toLowerCase().email().max(200).optional(),
         })
         .safeParse(req.body ?? {});
       if (!body.success) {
@@ -542,6 +618,15 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       if (p.is_active !== undefined) await users.setActive(target.id, p.is_active);
       if (p.is_admin !== undefined) await users.setAdmin(target.id, p.is_admin);
       if (p.display_name !== undefined) await users.setDisplayName(target.id, p.display_name);
+      if (p.email !== undefined) {
+        try {
+          await users.setEmail(target.id, p.email);
+        } catch {
+          return reply.code(400).send({
+            error: { code: 'email_already_bound', message: '这个邮箱已绑定到别的账号' },
+          });
+        }
+      }
 
       let newPassword: string | null = null;
       if (p.password !== undefined) {
@@ -646,6 +731,11 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
     if (result.created) {
       await orchestrator.onTaskCreated(result.task);
+      // 收到任务即发邮件（与浏览器通知独立：邮件不走冷却合并，
+      // 也不受静默时段影响——邮件本来就是低打扰通道，用户明确要求全量收）。
+      await sendTaskMailTo(ctx.userId, result.task, {
+        headline: 'AI 推送了一个新任务给你',
+      });
     }
 
     return reply.code(result.created ? 201 : 200).send({
@@ -708,11 +798,69 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     return { task };
   });
 
+  // 任务转交：把任务的所有权移给另一个账号，并通知对方（SSE + 邮件）
+  app.post<{ Params: { id: string } }>(
+    '/api/v1/tasks/:id/transfer',
+    { preHandler: authHooks },
+    async (req, reply) => {
+      const ctx = currentAuth(req);
+      const body = z
+        .object({ to_user_id: z.string().uuid() })
+        .safeParse(req.body ?? {});
+      if (!body.success) {
+        return reply
+          .code(400)
+          .send({ error: { code: 'invalid_argument', message: '请指定转交目标用户' } });
+      }
+
+      const target = await users.findById(body.data.to_user_id);
+      if (!target || !target.is_active) {
+        return reply
+          .code(400)
+          .send({ error: { code: 'user_not_found', message: '转交目标不存在或已被禁用' } });
+      }
+      if (target.id === ctx.userId) {
+        return reply
+          .code(400)
+          .send({ error: { code: 'invalid_argument', message: '不能把任务转交给自己' } });
+      }
+
+      const result = await tasks.transferTask(ctx.userId, req.params.id, target.id);
+      if (!result) {
+        return reply.code(404).send({ error: { code: 'task_not_found', message: '任务不存在' } });
+      }
+
+      // 给目标用户落一条通知记录并实时推送——任务本身已在对方的待处理列表里，
+      // 这条通知负责让 TA「知道」：横幅 + 提示音，和普通任务通知一个待遇。
+      const from = await users.findById(ctx.userId);
+      const inserted = await tasks.insertNotification({
+        userId: target.id,
+        taskId: result.to.id,
+        kind: 'task',
+        title: `${from?.username ?? '有人'} 把任务转交给你`,
+        body: result.to.title,
+        severity: result.to.severity,
+        taskCount: 1,
+        url: `${config.baseUrl}/t/${result.to.id}`,
+      });
+      if (inserted) {
+        bus.publish(target.id, { type: 'notification', data: inserted });
+      }
+
+      // 邮件通知目标用户（绑了邮箱才发）
+      await sendTaskMailTo(target.id, result.to, {
+        headline: `${from?.username ?? '同事'} 把一个任务转交给你`,
+        extra: `转交人：${from?.username ?? '未知'}`,
+      });
+
+      return { task: result.to };
+    },
+  );
+
   const statusRoute = (status: TaskStatus) => {
     return async (req: FastifyRequest & { params: { id: string } }, reply: any) => {
       const ctx = currentAuth(req);
-      const task = await tasks.setStatus(ctx.userId, req.params.id, status);
-      if (!task) {
+      const task = await tasks.setStatus(ctx.userId, req.params.id, status);      if (!task) {
         return reply.code(404).send({ error: { code: 'task_not_found', message: '任务不存在' } });
       }
       return { task };
@@ -833,6 +981,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       user_id: ctx.userId,
       username: user?.username ?? null,
       display_name: user?.display_name ?? null,
+      // 已绑定的邮箱：界面据此显示「绑定邮箱」提示与表单
+      email: user?.email ?? null,
       is_admin: ctx.scopes.includes('admin'),
       // 是否已绑定微信：界面据此显示「绑定 / 重新绑定」
       wechat_bound: !!user?.wechat_openid,
@@ -893,6 +1043,115 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       await db.query(`delete from sessions where user_id = $1`, [ctx.userId]);
     }
     return { ok: true };
+  });
+
+  // ---------------------------------------------------------------- 邮箱绑定
+
+  // 第一步：向目标邮箱发验证码。邮箱被别的账号绑着时直接拒绝。
+  app.post('/api/v1/me/email/start', { preHandler: authHooks }, async (req, reply) => {
+    const ctx = currentAuth(req);
+    const body = z
+      .object({ email: z.string().trim().toLowerCase().max(200) })
+      .safeParse(req.body ?? {});
+    if (!body.success || !EMAIL_RE.test(body.data.email)) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'invalid_argument', message: '请输入合法的邮箱地址' } });
+    }
+    if (!mailer.enabled) {
+      return reply.code(400).send({
+        error: {
+          code: 'email_not_configured',
+          message: '服务端没有配置 SMTP，无法发送验证邮件',
+        },
+      });
+    }
+
+    const taken = await db.query<{ id: string }>(
+      `select id from users where email = $1 and id <> $2 limit 1`,
+      [body.data.email, ctx.userId],
+    );
+    if (taken.rows[0]) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'email_already_bound', message: '这个邮箱已绑定到别的账号' } });
+    }
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    await db.query(`delete from email_verifications where expires_at < now()`);
+    await db.query(
+      `insert into email_verifications (email, code_hash, user_id, expires_at)
+       values ($1, $2, $3, now() + interval '15 minutes')
+       on conflict (email) do update
+         set code_hash = excluded.code_hash,
+             user_id = excluded.user_id,
+             created_at = now(),
+             expires_at = excluded.expires_at`,
+      [body.data.email, hashToken(code), ctx.userId],
+    );
+
+    await mailer.send({
+      to: body.data.email,
+      subject: `[AI Todo] 邮箱绑定验证码：${code}`,
+      text: `你的邮箱绑定验证码是 ${code}，15 分钟内有效。如果不是你本人操作，请忽略这封邮件。`,
+      html: `<p>你的邮箱绑定验证码是 <b style="font-size:18px;letter-spacing:2px">${code}</b>，15 分钟内有效。</p><p style="color:#888">如果不是你本人操作，请忽略这封邮件。</p>`,
+    });
+    return { ok: true };
+  });
+
+  // 第二步：回填验证码完成绑定。
+  app.post('/api/v1/me/email/confirm', { preHandler: authHooks }, async (req, reply) => {
+    const ctx = currentAuth(req);
+    const body = z
+      .object({ email: z.string().trim().toLowerCase().max(200), code: z.string().min(4).max(8) })
+      .safeParse(req.body ?? {});
+    if (!body.success) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'invalid_argument', message: '请输入邮箱和验证码' } });
+    }
+
+    const row = await db.query<{ code_hash: string; user_id: string; expires_at: string }>(
+      `select code_hash, user_id, expires_at from email_verifications where email = $1`,
+      [body.data.email],
+    );
+    const record = row.rows[0];
+    if (
+      !record ||
+      record.user_id !== ctx.userId ||
+      record.code_hash !== hashToken(body.data.code) ||
+      new Date(record.expires_at).getTime() < Date.now()
+    ) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'email_code_invalid', message: '验证码不正确或已过期' } });
+    }
+
+    try {
+      await users.setEmail(ctx.userId, body.data.email);
+    } catch {
+      return reply
+        .code(400)
+        .send({ error: { code: 'email_already_bound', message: '这个邮箱已绑定到别的账号' } });
+    }
+    await db.query(`delete from email_verifications where email = $1`, [body.data.email]);
+    const user = await users.findById(ctx.userId);
+    return { ok: true, email: user?.email ?? null };
+  });
+
+  // 可转交用户列表：任务转交的选人下拉用。只暴露最小字段。
+  app.get('/api/v1/users', { preHandler: authHooks }, async () => {
+    const res = await db.query<{
+      id: string;
+      username: string | null;
+      display_name: string | null;
+      email: string | null;
+    }>(
+      `select id, username, display_name, email from users
+        where is_active and username is not null
+        order by username asc`,
+    );
+    return { users: res.rows };
   });
 
   app.get('/api/v1/health', async () => ({ ok: true, driver: db.driver }));

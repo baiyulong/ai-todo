@@ -180,4 +180,17 @@ create table if not exists auth_pending_logins (
   expires_at    timestamptz not null
 );
 create index if not exists pending_login_exp_idx on auth_pending_logins (expires_at);
+
+-- ============ 邮箱绑定验证码 ============
+-- 绑定邮箱走「收验证码 → 回填确认」流程，防止把别人的邮箱绑到自己账号上。
+-- 一个邮箱同时只保留一条待验证记录（主键即邮箱）：重发验证码直接覆盖。
+-- code_hash 存哈希不存明文；expires_at 过期即作废（查询时顺带清理）。
+create table if not exists email_verifications (
+  email      text primary key,
+  code_hash  text not null,
+  user_id    uuid not null references users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+create index if not exists email_verif_exp_idx on email_verifications (expires_at);
 `;

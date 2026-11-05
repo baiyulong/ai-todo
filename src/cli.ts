@@ -32,7 +32,7 @@ const USAGE = `AI Todo
   ai-todo cloud      CloudBase 云端同步：push / pull / status
 
 示例：
-  ai-todo user add alice              建号并打印初始密码与访问令牌
+  ai-todo user add alice --email=alice@x.com   建号并打印初始密码与访问令牌
   ai-todo user list                   列出所有账号
   ai-todo user disable alice          禁用账号（同时吊销其令牌与会话）
   ai-todo user token alice --name=claude  为 alice 签发一枚 MCP 用的令牌
@@ -260,12 +260,17 @@ async function userCommand(): Promise<void> {
 
   if (sub === 'add') {
     const username = positional(1) ?? argValue('username');
-    if (!username) {
-      console.error('用法：ai-todo user add <用户名> [--password=xxx] [--display-name=xx] [--admin]');
+    const email = argValue('email');
+    if (!username || !email) {
+      console.error(
+        '用法：ai-todo user add <用户名> --email=<邮箱> [--password=xxx] [--display-name=xx] [--admin]',
+      );
+      console.error('账号必须绑定邮箱：任务邮件与转交通知都发到这个地址。');
       process.exit(1);
     }
     const payload = await call('POST', '/api/v1/admin/users', {
       username,
+      email,
       password: argValue('password'),
       display_name: argValue('display-name'),
       is_admin: hasFlag('admin') || undefined,
@@ -274,6 +279,7 @@ async function userCommand(): Promise<void> {
     console.log('  账号已创建');
     console.log('  ─────────────────────────────────────────');
     console.log(`  用户名   ${payload.user.username}`);
+    console.log(`  邮箱     ${payload.user.email ?? '-'}`);
     console.log(`  初始密码 ${payload.password}`);
     console.log(`  访问令牌 ${payload.token}`);
     console.log('');

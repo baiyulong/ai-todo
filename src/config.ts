@@ -64,6 +64,19 @@ export interface WechatConfig {
   mock: boolean;
 }
 
+export interface MailConfig {
+  /** SMTP 配齐 host 时启用；未启用时发信降级为日志 */
+  enabled: boolean;
+  host: string;
+  port: number;
+  /** 465 为 true（隐式 TLS），587 等为 false（STARTTLS） */
+  secure: boolean;
+  user: string;
+  pass: string;
+  /** 发件人，如 "AI Todo <no-reply@example.com>" */
+  from: string;
+}
+
 export interface Config {
   port: number;
   host: string;
@@ -80,6 +93,7 @@ export interface Config {
   /** 保留给未来的外部通道（配置 B）；配置 A 下始终为空 */
   externalChannels: string[];
   wechat: WechatConfig;
+  mail: MailConfig;
 }
 
 export function loadConfig(): Config {
@@ -107,6 +121,21 @@ export function loadConfig(): Config {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // 邮件：配了 SMTP_HOST 即启用；没配则降级为日志模式（本地开发不用配）
+  const mailHost = process.env.AI_TODO_SMTP_HOST?.trim() || '';
+  const mailPort = Number(process.env.AI_TODO_SMTP_PORT ?? 465);
+  const mail: MailConfig = {
+    enabled: mailHost !== '',
+    host: mailHost,
+    port: mailPort,
+    secure: (process.env.AI_TODO_SMTP_SECURE ?? (mailPort === 465 ? 'on' : 'off'))
+      .trim()
+      .toLowerCase() === 'on',
+    user: process.env.AI_TODO_SMTP_USER?.trim() || '',
+    pass: process.env.AI_TODO_SMTP_PASS ?? '',
+    from: process.env.AI_TODO_SMTP_FROM?.trim() || `AI Todo <${process.env.AI_TODO_SMTP_USER?.trim() || 'no-reply@localhost'}>`,
+  };
+
   return {
     port,
     host,
@@ -132,5 +161,6 @@ export function loadConfig(): Config {
         (process.env.AI_TODO_WECHAT_AUTO_TOKEN ?? 'on').trim().toLowerCase() !== 'off',
       mock: wechatMock,
     },
+    mail,
   };
 }

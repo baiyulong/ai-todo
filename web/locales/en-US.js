@@ -88,6 +88,13 @@ export const dict = {
   'task.hardDeleteLabel': 'Delete task permanently',
   'task.deletedToast': 'Archived — find it again under the “All” tab',
 
+  // ---------------- Task transfer ----------------
+  'task.transfer': 'Hand off',
+  'task.transferLabel': 'Pick a person to hand off to',
+  'task.transferPlaceholder': 'Hand off to…',
+  'task.transferPick': 'Pick a person first',
+  'task.transferredToast': 'Handed off to {user} — they have been notified',
+
   // ---------------- Actions ----------------
   'action.ack': 'Take',
   'action.done': 'Done',
@@ -171,6 +178,22 @@ export const dict = {
   'perm.default': 'Not set',
   'perm.unsupported': 'Unsupported',
 
+  // ---------------- Email binding ----------------
+  'email.section': 'Email',
+  'email.current': 'Bound email',
+  'email.boundHint': 'Task notifications and hand-offs are sent to this address.',
+  'email.needBind': 'No email bound yet. Once bound, new tasks and hand-offs will reach you by email.',
+  'email.placeholder': 'Email address',
+  'email.codePlaceholder': '6-digit code',
+  'email.sendCode': 'Send code',
+  'email.bind': 'Confirm',
+  'email.codeSent': 'Code sent — check your inbox (valid for 15 minutes)',
+  'email.needEmail': 'Please enter an email address',
+  'email.needCode': 'Please enter the code',
+  'email.boundToast': 'Email bound',
+  'email.bannerText': 'No email bound — task and hand-off email notifications cannot reach you.',
+  'email.bannerBtn': 'Bind now',
+
   // ---------------- Change password ----------------
   'password.change': 'Change password',
   'password.set': 'Set a password',
@@ -238,6 +261,9 @@ export const dict = {
   'user.disabledToast': 'Account disabled',
   'user.enabledToast': 'Account enabled',
   'user.newUsernamePlaceholder': 'New username (3–32 chars: lowercase letters, digits, . _ -)',
+  'user.newEmailPlaceholder': 'Email (required, receives task notifications)',
+  'user.needEmail': 'Please enter an email address',
+  'user.noEmail': 'No email bound',
   'user.create': 'Create account',
   'user.needUsername': 'Please enter a username',
   'user.createdToast': 'Account created: {username} — the initial password is shown only once',
@@ -279,6 +305,9 @@ export const dict = {
   'error.unauthorized': 'Your session expired — please sign in again',
   'error.invalid_credentials': 'Incorrect username or password',
   'error.wrong_password': 'Current password is incorrect',
+  'error.email_not_configured': 'SMTP is not configured on the server — verification email cannot be sent',
+  'error.email_already_bound': 'This email is already bound to another account',
+  'error.email_code_invalid': 'Invalid or expired code',
   'error.invalid_argument': 'Invalid argument',
   'error.invalid_argument.enum': 'Invalid value for {param}: {value}. Allowed: {allowed}',
   'error.invalid_argument.uuid': 'Path parameter {param} is not a valid UUID: {value}',

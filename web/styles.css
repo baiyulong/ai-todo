@@ -645,6 +645,24 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .banner span { flex: 1; }
 .banner .btn { flex: 0 0 auto; }
 
+/* 邮箱未绑定横幅：警示色系，和通知权限横幅区分开 */
+.banner-email { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.banner-email svg { color: var(--warn); }
+
+/* 任务卡上的转交控件：下拉 + 按钮并排 */
+.task-transfer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.task-transfer .select { width: auto; min-width: 150px; font-size: 12.5px; padding-top: 4px; padding-bottom: 4px; }
+
+/* 设置抽屉里的邮箱绑定：验证码输入 + 发送按钮并排 */
+.email-code-row { display: flex; gap: 8px; }
+.email-code-row .input { flex: 1; min-width: 0; }
+.email-code-row .btn { flex: none; white-space: nowrap; }
+
 /* ---------------- 工具栏 ---------------- */
 
 .toolbar {

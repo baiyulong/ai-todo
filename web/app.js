@@ -18,6 +18,8 @@ const state = {
   lastToken: null,
   /** 当前视图：任务列表 / 用户管理 / 令牌管理 */
   view: 'tasks',
+  /** 全体有效账号（转交任务时的选人下拉） */
+  users: [],
   /** 最近一次创建账号拿到的初始凭据，只在当前页面显示一次 */
   freshUserCredentials: null,
   /** 服务端支持的登录方式 */
@@ -464,10 +466,51 @@ async function bootstrap() {
   await loadSources();
   await loadTasks();
   await loadMe();
+  loadUsers();
   connectStream();
   registerServiceWorker();
   updateNotifyBanner();
+  updateEmailBanner();
   applyDeepLink();
+}
+
+/** 拉取可转交的用户列表（转交下拉的选项）。失败不致命：下拉为空时转交按钮禁用。 */
+async function loadUsers() {
+  try {
+    const { users } = await api.get('/api/v1/users');
+    state.users = users || [];
+  } catch { /* 忽略 */ }
+  renderTransferOptions();
+}
+
+/** 任务卡上「转交」下拉的选项：排除自己 */
+function renderTransferOptions() {
+  for (const sel of document.querySelectorAll('.task-transfer-select')) {
+    const current = sel.value;
+    sel.textContent = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = t('task.transferPlaceholder');
+    sel.appendChild(placeholder);
+    for (const u of state.users) {
+      if (u.id === state.me?.user_id) continue;
+      const o = document.createElement('option');
+      o.value = u.id;
+      o.textContent = u.display_name ? `${u.username}（${u.display_name}）` : u.username;
+      sel.appendChild(o);
+    }
+    if (current) sel.value = current;
+  }
+}
+
+/**
+ * 未绑定邮箱横幅：账号必须有邮箱才能收到任务与转交的邮件通知。
+ * 绑定好了就永久消失。
+ */
+function updateEmailBanner() {
+  const banner = $('email-banner');
+  if (!banner) return;
+  banner.hidden = !!state.me?.email;
 }
 
 async function loadSources() {
@@ -516,6 +559,7 @@ async function loadMe() {
     updatePending(state.me.pending);
     updateClearArchivedButton();
     renderUser();
+    updateEmailBanner();
   } catch { /* 忽略 */ }
 }
 
@@ -775,6 +819,37 @@ function renderTask(task) {
     }
     if (task.status === 'pending') {
       actions.appendChild(actionBtn(t('action.snooze'), 'btn', (btn) => toggleSnooze(task, btn)));
+    }
+
+    // 转交：选人 + 转交按钮。目标用户会收到站内通知和邮件。
+    if (task.status === 'pending' || task.status === 'acked') {
+      const wrap = document.createElement('span');
+      wrap.className = 'task-transfer';
+
+      const sel = document.createElement('select');
+      sel.className = 'select task-transfer-select';
+      sel.setAttribute('aria-label', t('task.transferLabel'));
+      wrap.appendChild(sel);
+
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.className = 'btn';
+      go.textContent = t('task.transfer');
+      go.disabled = state.users.length <= 1;
+      go.addEventListener('click', async () => {
+        if (!sel.value) { toast(t('task.transferPick'), true); return; }
+        try {
+          await api.post(`/api/v1/tasks/${task.id}/transfer`, { to_user_id: sel.value });
+          const target = state.users.find((u) => u.id === sel.value);
+          toast(t('task.transferredToast', { user: target?.username ?? '' }));
+          await loadTasks();
+        } catch (err) {
+          toast(translateError(err), true);
+        }
+      });
+      wrap.appendChild(go);
+      actions.appendChild(wrap);
+      renderTransferOptions();
     }
 
     card.appendChild(actions);
@@ -1133,6 +1208,9 @@ $('btn-enable-notify').addEventListener('click', async () => {
 
 $('btn-dismiss-banner').addEventListener('click', () => { $('notify-banner').hidden = true; });
 
+// 邮箱横幅按钮：打开设置抽屉直奔绑定表单
+$('btn-bind-email').addEventListener('click', () => openDrawer('settings'));
+
 /* ---------------------------------------------------------------- 筛选 */
 
 document.querySelectorAll('.tab').forEach((tab) => {
@@ -1402,6 +1480,79 @@ function renderDrawer() {
     body.appendChild(s2p);
   }
 
+  // 邮箱：任务通知与转交通知都发到这里。账号必须绑定，没绑就给绑定表单。
+  if (state.me) {
+    const s2e = section(t('email.section'));
+    if (state.me.email) {
+      s2e.appendChild(statusRow(t('email.current'), state.me.email, 'ok'));
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = t('email.boundHint');
+      s2e.appendChild(hint);
+    } else {
+      s2e.appendChild(hint(t('email.needBind')));
+
+      const emailInput = document.createElement('input');
+      emailInput.className = 'input';
+      emailInput.type = 'email';
+      emailInput.placeholder = t('email.placeholder');
+      emailInput.autocomplete = 'email';
+      emailInput.style.marginBottom = '8px';
+
+      const codeRow = document.createElement('div');
+      codeRow.className = 'email-code-row';
+      const codeInput = document.createElement('input');
+      codeInput.className = 'input';
+      codeInput.inputMode = 'numeric';
+      codeInput.maxLength = 6;
+      codeInput.placeholder = t('email.codePlaceholder');
+      const sendBtn = document.createElement('button');
+      sendBtn.type = 'button';
+      sendBtn.className = 'btn btn-quiet';
+      sendBtn.textContent = t('email.sendCode');
+      sendBtn.addEventListener('click', async () => {
+        if (!emailInput.value.trim()) { toast(t('email.needEmail'), true); return; }
+        sendBtn.disabled = true;
+        try {
+          await api.post('/api/v1/me/email/start', { email: emailInput.value.trim() });
+          toast(t('email.codeSent'));
+        } catch (err) {
+          toast(translateError(err), true);
+        } finally {
+          setTimeout(() => { sendBtn.disabled = false; }, 3000);
+        }
+      });
+      codeRow.appendChild(codeInput);
+      codeRow.appendChild(sendBtn);
+      codeRow.style.marginBottom = '8px';
+
+      const bindBtn = document.createElement('button');
+      bindBtn.type = 'button';
+      bindBtn.className = 'btn btn-primary btn-block';
+      bindBtn.textContent = t('email.bind');
+      bindBtn.addEventListener('click', async () => {
+        if (!codeInput.value.trim()) { toast(t('email.needCode'), true); return; }
+        try {
+          const res = await api.post('/api/v1/me/email/confirm', {
+            email: emailInput.value.trim(),
+            code: codeInput.value.trim(),
+          });
+          state.me.email = res.email;
+          toast(t('email.boundToast'));
+          renderDrawer();
+          updateEmailBanner();
+        } catch (err) {
+          toast(translateError(err), true);
+        }
+      });
+
+      s2e.appendChild(emailInput);
+      s2e.appendChild(codeRow);
+      s2e.appendChild(bindBtn);
+    }
+    body.appendChild(s2e);
+  }
+
   // 语言
   const s2b = section(t('section.language'));
   for (const [code, meta] of Object.entries(LOCALES)) {
@@ -1493,15 +1644,24 @@ function renderUsersPage() {
   uname.maxLength = 32;
   uname.autocapitalize = 'off';
   uname.spellcheck = false;
+  // 账号必须绑定邮箱：任务邮件与转交通知都发到这个地址
+  const uemail = document.createElement('input');
+  uemail.className = 'input';
+  uemail.type = 'email';
+  uemail.placeholder = t('user.newEmailPlaceholder');
+  uemail.autocomplete = 'off';
   const create = document.createElement('button');
   create.className = 'btn btn-primary';
   create.textContent = t('user.create');
   create.addEventListener('click', async () => {
     const username = uname.value.trim().toLowerCase();
+    const email = uemail.value.trim().toLowerCase();
     if (!username) { toast(t('user.needUsername'), true); return; }
+    if (!email) { toast(t('user.needEmail'), true); return; }
     try {
-      const res = await api.post('/api/v1/admin/users', { username });
+      const res = await api.post('/api/v1/admin/users', { username, email });
       uname.value = '';
+      uemail.value = '';
       // 初始密码与令牌只显示一次：摊开在页面里，复制按钮伺候
       state.freshUserCredentials = { username: res.user.username, password: res.password, token: res.token };
       if (res.token) state.lastToken = res.token;
@@ -1512,6 +1672,7 @@ function renderUsersPage() {
     }
   });
   createRow.appendChild(uname);
+  createRow.appendChild(uemail);
   createRow.appendChild(create);
   createCard.appendChild(createRow);
   body.appendChild(createCard);
@@ -1585,11 +1746,16 @@ function userTableRow(isHead, u) {
   nameSpan.className = 'mgmt-name';
   nameSpan.textContent = u.username || t('user.noUsername');
   cellUser.appendChild(nameSpan);
-  if (u.display_name) {
-    const dn = document.createElement('span');
-    dn.className = 'mgmt-sub';
-    dn.textContent = u.display_name;
-    cellUser.appendChild(dn);
+  if (u.email) {
+    const em = document.createElement('span');
+    em.className = 'mgmt-sub';
+    em.textContent = u.email;
+    cellUser.appendChild(em);
+  } else {
+    const em = document.createElement('span');
+    em.className = 'mgmt-sub badge-warn';
+    em.textContent = t('user.noEmail');
+    cellUser.appendChild(em);
   }
   if (state.me && u.id === state.me.id) {
     const you = document.createElement('span');

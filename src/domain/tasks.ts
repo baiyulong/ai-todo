@@ -187,6 +187,39 @@ export class TaskService {
     return task;
   }
 
+  /**
+   * 把任务转交给其他用户：改归属、记事件。
+   * 只有当前归属人能转（where user_id = $1 天然限制了越权）。
+   * 返回转交前的任务快照（供通知文案用），任务不存在或不属于该用户时为 null。
+   */
+  async transferTask(
+    userId: string,
+    id: string,
+    toUserId: string,
+  ): Promise<{ from: Task; to: Task } | null> {
+    const current = await this.getTask(userId, id);
+    if (!current) return null;
+    if (toUserId === userId) return null;
+
+    const res = await this.db.query<Task>(
+      `update tasks
+          set user_id = $3,
+              -- 归属都换了，处理状态重新开始：接手 / 完成的时间戳跟着作废
+              status = 'pending'::task_status,
+              acked_at = null,
+              done_at = null,
+              updated_at = now()
+        where id = $2 and user_id = $1
+        returning *`,
+      [userId, id, toUserId],
+    );
+    const transferred = res.rows[0];
+    if (!transferred) return null;
+
+    await this.recordEvent(userId, id, 'task.transferred', { to_user_id: toUserId });
+    return { from: current, to: transferred };
+  }
+
   /** 已归档任务数：用来判断「清空已归档」按钮该不该出现 */
   async countArchived(userId: string): Promise<number> {
     const res = await this.db.query<{ n: string }>(

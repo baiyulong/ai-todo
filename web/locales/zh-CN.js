@@ -88,6 +88,13 @@ export const dict = {
   'task.hardDeleteLabel': '彻底删除任务',
   'task.deletedToast': '已删除，可在「全部」标签里找回',
 
+  // ---------------- 任务转交 ----------------
+  'task.transfer': '转交',
+  'task.transferLabel': '选择转交目标',
+  'task.transferPlaceholder': '转给谁…',
+  'task.transferPick': '请先选择转交目标',
+  'task.transferredToast': '已转交给 {user}，对方会收到通知',
+
   // ---------------- 动作按钮 ----------------
   'action.ack': '接手',
   'action.done': '完成',
@@ -171,6 +178,22 @@ export const dict = {
   'perm.default': '未设置',
   'perm.unsupported': '不支持',
 
+  // ---------------- 邮箱绑定 ----------------
+  'email.section': '邮箱',
+  'email.current': '绑定邮箱',
+  'email.boundHint': '任务与转交通知会发送到这个邮箱。',
+  'email.needBind': '账号还没有绑定邮箱。绑定后，新任务和转交给你的任务都会邮件通知你。',
+  'email.placeholder': '邮箱地址',
+  'email.codePlaceholder': '6 位验证码',
+  'email.sendCode': '获取验证码',
+  'email.bind': '确认绑定',
+  'email.codeSent': '验证码已发送，请查收邮件（15 分钟内有效）',
+  'email.needEmail': '请输入邮箱地址',
+  'email.needCode': '请输入验证码',
+  'email.boundToast': '邮箱绑定成功',
+  'email.bannerText': '账号尚未绑定邮箱，任务与转交的邮件通知发不出去。',
+  'email.bannerBtn': '去绑定',
+
   // ---------------- 修改密码 ----------------
   'password.change': '修改密码',
   'password.set': '设置密码',
@@ -238,6 +261,9 @@ export const dict = {
   'user.disabledToast': '账号已禁用',
   'user.enabledToast': '账号已启用',
   'user.newUsernamePlaceholder': '新用户名（3–32 位，小写字母/数字/._-）',
+  'user.newEmailPlaceholder': '邮箱（必填，接收任务通知）',
+  'user.needEmail': '请输入邮箱',
+  'user.noEmail': '未绑定邮箱',
   'user.create': '新建账号',
   'user.needUsername': '请输入用户名',
   'user.createdToast': '账号已创建：{username}，初始密码只显示这一次',
@@ -279,6 +305,9 @@ export const dict = {
   'error.unauthorized': '登录已失效，请重新登录',
   'error.invalid_credentials': '用户名或密码不正确',
   'error.wrong_password': '当前密码不正确',
+  'error.email_not_configured': '服务端没有配置 SMTP，无法发送验证邮件',
+  'error.email_already_bound': '这个邮箱已绑定到别的账号',
+  'error.email_code_invalid': '验证码不正确或已过期',
   'error.invalid_argument': '参数不合法',
   'error.invalid_argument.enum': '参数 {param} 取值非法：{value}；可选值 {allowed}',
   'error.invalid_argument.uuid': '路径参数 {param} 不是合法的 UUID：{value}',

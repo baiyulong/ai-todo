@@ -232,6 +232,15 @@ export class UserService {
     const existing = await this.findByUsername(username);
     if (existing) throw new Error(`用户名已存在：${username}`);
 
+    // 邮箱全局唯一：建号时就占住，别等数据库约束抛一堆看不懂的报错
+    if (input.email) {
+      const emailTaken = await this.db.query<{ id: string }>(
+        `select id from users where email = $1 limit 1`,
+        [input.email.trim().toLowerCase()],
+      );
+      if (emailTaken.rows[0]) throw new Error('该邮箱已绑定到别的账号');
+    }
+
     const passwordHash = await hashPassword(input.password);
     const res = await this.db.query<UserRow>(
       `insert into users (username, display_name, email, password_hash, is_admin, is_active)
@@ -240,7 +249,7 @@ export class UserService {
       [
         username,
         input.displayName ?? null,
-        input.email ?? null,
+        input.email ? input.email.trim().toLowerCase() : null,
         passwordHash,
         input.isAdmin ?? false,
       ],
@@ -313,6 +322,20 @@ export class UserService {
       userId,
       displayName,
     ]);
+  }
+
+  /**
+   * 绑定 / 更新邮箱。
+   * 邮箱全局唯一：已被别的账号绑定时抛错（调用方翻译成友好文案）。
+   */
+  async setEmail(userId: string, email: string): Promise<void> {
+    const normalized = email.trim().toLowerCase();
+    const res = await this.db.query<{ id: string }>(
+      `select id from users where email = $1 and id <> $2 limit 1`,
+      [normalized, userId],
+    );
+    if (res.rows[0]) throw new Error('email_already_bound');
+    await this.db.query(`update users set email = $2 where id = $1`, [userId, normalized]);
   }
 
   /**
