@@ -98,6 +98,7 @@ export const dict = {
   'task.transferredToast': '已转交给 {user}，对方会收到通知',
   'task.transferDisabledHint': '当前只有你一个用户，没有可转交的对象',
   'task.replyLabel': '我的回复',
+  'task.replyCopy': '复制回复',
   'task.replyPlaceholder': '回复这个任务——回复后任务完成，正在等待的 AI 会立刻收到',
   'task.reply': '回复',
   'task.repliedToast': '已回复，AI 会收到你的答复',

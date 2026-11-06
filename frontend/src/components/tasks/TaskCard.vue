@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 import { useUiStore } from '../../stores/ui.js';
 import { useSessionStore } from '../../stores/session.js';
 import { useTasksStore, computeSnooze } from '../../stores/tasks.js';
+import { copyText } from '../../composables/clipboard.js';
 import { t } from '../../i18n.js';
 
 const props = defineProps({
@@ -112,6 +113,12 @@ async function doReply() {
   await tasks.replyTask(props.task.id, text);
   replyText.value = '';
 }
+
+/* 一键复制回复内容（气泡右上角按钮） */
+async function copyReply() {
+  const ok = await copyText(props.task.reply_text ?? '');
+  ui.toast(ok ? t('token.copiedToast') : t('token.copyFailedToast'), !ok);
+}
 </script>
 
 <template>
@@ -192,9 +199,18 @@ async function doReply() {
     <template v-if="expanded">
       <p v-if="task.detail" class="task-detail">{{ task.detail }}</p>
 
-      <!-- 已有回复：气泡展示（回复过任务 = 已完成并答复了 AI） -->
+      <!-- 已有回复：气泡展示（回复过任务 = 已完成并答复了 AI），右上角一键复制 -->
       <div v-if="task.reply_text" class="task-reply">
-        <div class="task-reply-head">{{ t('task.replyLabel') }} · {{ formatTime(task.replied_at) }}</div>
+        <div class="task-reply-head">
+          <span>{{ t('task.replyLabel') }} · {{ formatTime(task.replied_at) }}</span>
+          <button
+            class="btn btn-sm btn-quiet reply-copy"
+            type="button"
+            :title="t('task.replyCopy')"
+            :aria-label="t('task.replyCopy')"
+            @click.stop="copyReply"
+          >{{ t('task.replyCopy') }}</button>
+        </div>
         <div class="task-reply-body">{{ task.reply_text }}</div>
       </div>
 

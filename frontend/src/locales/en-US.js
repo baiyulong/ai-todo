@@ -98,6 +98,7 @@ export const dict = {
   'task.transferredToast': 'Handed off to {user} — they have been notified',
   'task.transferDisabledHint': 'You are the only user — nobody to hand off to',
   'task.replyLabel': 'Your reply',
+  'task.replyCopy': 'Copy reply',
   'task.replyPlaceholder': 'Reply to this task — it is marked done and the waiting AI receives it right away',
   'task.reply': 'Reply',
   'task.repliedToast': 'Replied — the AI will receive your answer',
