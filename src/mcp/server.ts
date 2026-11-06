@@ -180,7 +180,9 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
     'todo_update',
     {
       title: '修改待办事项',
-      description: '修改任务的标题、详情、级别或项目。',
+      description:
+        '修改任务的标题、详情、级别或项目。注意：更新已完成（done）或已归档（archived）的任务会把它重新打开为 pending，' +
+        '用户会再次看到并需要处理它；如果这是一件全新的事项，请改用 todo_create 新建，不要复用旧任务。',
       inputSchema: {
         id: z.string().min(1).describe('完整任务 ID（UUID），来自 todo_create 返回的 task_id，不要截短'),
         title: z.string().min(1).max(200).optional(),

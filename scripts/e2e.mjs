@@ -952,6 +952,34 @@ async function main() {
     JSON.stringify(getReplyRes.structuredContent ?? getReplyRes.content?.[0]?.text),
   );
 
+  /* 更新即重开：agent 更新已完成（回复过）的任务，状态必须回到 pending */
+  const reopenRes = await userApi(`/api/v1/tasks/${mcpTaskId}`, {
+    method: 'PATCH',
+    cookie: userCookie,
+    body: JSON.stringify({ detail: '任务有了新的进展，需要用户再看一眼' }),
+  });
+  check(
+    '更新已完成的任务会重新打开为 pending',
+    reopenRes.res.status === 200 &&
+      reopenRes.body.task.status === 'pending' &&
+      reopenRes.body.task.done_at === null,
+    `HTTP ${reopenRes.res.status} status=${reopenRes.body?.task?.status}`,
+  );
+  const archivedReopen = await client.callTool({
+    name: 'todo_archive',
+    arguments: { id: mcpTaskId },
+  });
+  const reopen2 = await client.callTool({
+    name: 'todo_update',
+    arguments: { id: mcpTaskId, title: `MCP 创建的任务（重开）${mcpStamp}` },
+  });
+  check(
+    '更新已归档的任务也会重开为 pending',
+    archivedReopen.structuredContent?.status === 'archived' &&
+      reopen2.structuredContent?.status === 'pending',
+    `archive=${archivedReopen.structuredContent?.status} update=${reopen2.structuredContent?.status}`,
+  );
+
   /* 超时分支：新任务没人回复，短等待应返回 replied=false 且不报错 */
   const timeoutTask = await client.callTool({
     name: 'todo_create',
