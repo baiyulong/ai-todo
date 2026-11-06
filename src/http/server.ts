@@ -199,7 +199,9 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       return reply.code(400).send({
         error: {
           code: 'invalid_argument',
-          message: `路径参数 id 不是合法的 UUID：${id}`,
+          message:
+            `路径参数 id 不是合法的 UUID：${id}。` +
+            '请使用 todo_create / todo_list 返回的完整 task_id（UUID），不要用截短的短号。',
           details: { kind: 'uuid', param: 'id', value: id },
         },
       });
