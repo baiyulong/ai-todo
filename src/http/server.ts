@@ -98,6 +98,8 @@ const createTaskSchema = z.object({
 const updateTaskSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   detail: z.string().max(8000).nullable().optional(),
+  /** true=detail 追加到原文后面（带时间分隔线），保留历史；默认 false=覆盖 */
+  append: z.boolean().optional(),
   severity: z.enum(['info', 'need_human', 'blocker']).optional(),
   project_id: z.string().uuid().nullable().optional(),
   project: z.string().max(120).nullable().optional(),
@@ -984,6 +986,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       task = await tasks.updateTask(ctx.userId, req.params.id, {
         title: p.title,
         detail: p.detail,
+        appendDetail: p.append === true,
         severity: p.severity,
         projectId: p.project_id,
         project: p.project,

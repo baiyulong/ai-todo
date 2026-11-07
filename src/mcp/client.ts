@@ -85,7 +85,9 @@ export class TodoApiClient {
     id: string,
     patch: Partial<{
       title: string;
-      detail: string | null;
+      detail: string;
+      /** true=detail 追加到原文后面（带时间分隔线），保留历史 */
+      append: boolean;
       severity: TaskSeverity;
       project: string | null;
       notify: boolean;

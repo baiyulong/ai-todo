@@ -12,6 +12,13 @@ import type {
   TaskStatus,
 } from './types.js';
 
+/** 追加更新的时间戳标记：YYYY-MM-DD HH:mm（服务器本地时区） */
+function stampNow(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export interface CreateTaskInput {
   userId: string;
   title: string;
@@ -299,6 +306,8 @@ export class TaskService {
       links: Link[];
       notifyRequested: boolean;
       dueAt: string | null;
+      /** true=detail 追加而不是覆盖：新内容带时间分隔线接在原文后面，保留历史 */
+      appendDetail: boolean;
     }>,
   ): Promise<Task | null> {
     const sets: string[] = [];
@@ -310,7 +319,18 @@ export class TaskService {
     };
 
     if (patch.title !== undefined) push('title', patch.title);
-    if (patch.detail !== undefined) push('detail', patch.detail);
+    if (patch.detail !== undefined) {
+      if (patch.appendDetail && typeof patch.detail === 'string' && patch.detail.trim()) {
+        const existing = await this.getTask(userId, id);
+        if (existing?.detail?.trim()) {
+          push('detail', `${existing.detail}\n\n—— ${stampNow()} 更新 ——\n${patch.detail}`);
+        } else {
+          push('detail', patch.detail);
+        }
+      } else {
+        push('detail', patch.detail);
+      }
+    }
     if (patch.severity !== undefined) push('severity', patch.severity);
     if (patch.projectId !== undefined) {
       if (patch.projectId === null) {

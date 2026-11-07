@@ -1006,6 +1006,33 @@ async function main() {
   check('MCP todo_archive 可用', !archiveRes.isError, archiveRes.content?.[0]?.text);
   check('归档后状态为 archived', archiveRes.structuredContent?.status === 'archived', archiveRes.structuredContent?.status);
 
+  /* append=true：detail 追加而不是覆盖，历史内容保留并带时间分隔线；任务同时重开 */
+  const appendRes = await userApi(`/api/v1/tasks/${mcpTaskId}`, {
+    method: 'PATCH',
+    cookie: userCookie,
+    body: JSON.stringify({ detail: '追加的进展说明', append: true }),
+  });
+  check(
+    'append=true 追加 detail 且保留原文',
+    appendRes.res.status === 200 &&
+      appendRes.body.task.status === 'pending' &&
+      appendRes.body.task.detail.includes('任务有了新的进展') &&
+      appendRes.body.task.detail.includes('追加的进展说明') &&
+      /—— \d{4}-\d{2}-\d{2} \d{2}:\d{2} 更新 ——/.test(appendRes.body.task.detail),
+    JSON.stringify(appendRes.body?.task?.detail)?.slice(0, 160),
+  );
+  const overwriteRes = await userApi(`/api/v1/tasks/${mcpTaskId}`, {
+    method: 'PATCH',
+    cookie: userCookie,
+    body: JSON.stringify({ detail: '覆盖后的详情' }),
+  });
+  check(
+    '不带 append 仍然是覆盖语义',
+    overwriteRes.res.status === 200 &&
+      overwriteRes.body.task.detail === '覆盖后的详情',
+    JSON.stringify(overwriteRes.body?.task?.detail)?.slice(0, 120),
+  );
+
   const readRes = await client.readResource({ uri: 'todo://tasks' });
   const text = readRes.contents?.[0]?.text ?? '';
   check('MCP 资源可读', typeof text === 'string' && text.includes('待我关注'), text.slice(0, 40));

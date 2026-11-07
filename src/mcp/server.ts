@@ -182,11 +182,16 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
       title: '修改待办事项',
       description:
         '修改任务的标题、详情、级别或项目。注意：更新已完成（done）或已归档（archived）的任务会把它重新打开为 pending，' +
-        '用户会再次看到并需要处理它；如果这是一件全新的事项，请改用 todo_create 新建，不要复用旧任务。',
+        '用户会再次看到并需要处理它；如果这是一件全新的事项，请改用 todo_create 新建，不要复用旧任务。' +
+        '汇报进展等需要保留上下文的更新，用 append=true 把新内容追加到详情末尾而不是覆盖。',
       inputSchema: {
         id: z.string().min(1).describe('完整任务 ID（UUID），来自 todo_create 返回的 task_id，不要截短'),
         title: z.string().min(1).max(200).optional(),
         detail: z.string().max(8000).optional(),
+        append: z
+          .boolean()
+          .optional()
+          .describe('true=把 detail 追加到现有详情后面（自动带时间分隔线），保留历史内容；默认 false=直接覆盖 detail'),
         severity: z.enum(SEVERITIES).optional(),
         project: z.string().optional(),
       },
@@ -196,6 +201,7 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
         const { task } = await api.updateTask(args.id, {
           title: args.title,
           detail: args.detail,
+          append: args.append === true,
           severity: args.severity as TaskSeverity | undefined,
           project: args.project,
         });
