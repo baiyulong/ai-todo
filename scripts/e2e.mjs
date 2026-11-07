@@ -952,32 +952,32 @@ async function main() {
     JSON.stringify(getReplyRes.structuredContent ?? getReplyRes.content?.[0]?.text),
   );
 
-  /* 更新即重开：agent 更新已完成（回复过）的任务，状态必须回到 pending */
-  const reopenRes = await userApi(`/api/v1/tasks/${mcpTaskId}`, {
+  /* 内容更新不改状态：agent 更新已回复（done）任务的内容，状态保持 done；状态只由用户操作 */
+  const updateRes = await userApi(`/api/v1/tasks/${mcpTaskId}`, {
     method: 'PATCH',
     cookie: userCookie,
     body: JSON.stringify({ detail: '任务有了新的进展，需要用户再看一眼' }),
   });
   check(
-    '更新已完成的任务会重新打开为 pending',
-    reopenRes.res.status === 200 &&
-      reopenRes.body.task.status === 'pending' &&
-      reopenRes.body.task.done_at === null,
-    `HTTP ${reopenRes.res.status} status=${reopenRes.body?.task?.status}`,
+    '更新已完成任务的内容不会改变状态',
+    updateRes.res.status === 200 &&
+      updateRes.body.task.status === 'done' &&
+      updateRes.body.task.detail === '任务有了新的进展，需要用户再看一眼',
+    `HTTP ${updateRes.res.status} status=${updateRes.body?.task?.status}`,
   );
-  const archivedReopen = await client.callTool({
+  const archivedRes = await client.callTool({
     name: 'todo_archive',
     arguments: { id: mcpTaskId },
   });
-  const reopen2 = await client.callTool({
+  const updateArchived = await client.callTool({
     name: 'todo_update',
-    arguments: { id: mcpTaskId, title: `MCP 创建的任务（重开）${mcpStamp}` },
+    arguments: { id: mcpTaskId, title: `MCP 创建的任务（已归档后更新）${mcpStamp}` },
   });
   check(
-    '更新已归档的任务也会重开为 pending',
-    archivedReopen.structuredContent?.status === 'archived' &&
-      reopen2.structuredContent?.status === 'pending',
-    `archive=${archivedReopen.structuredContent?.status} update=${reopen2.structuredContent?.status}`,
+    '更新已归档任务的内容同样不改变状态',
+    archivedRes.structuredContent?.status === 'archived' &&
+      updateArchived.structuredContent?.status === 'archived',
+    `archive=${archivedRes.structuredContent?.status} update=${updateArchived.structuredContent?.status}`,
   );
 
   /* 超时分支：新任务没人回复，短等待应返回 replied=false 且不报错 */
@@ -1006,20 +1006,20 @@ async function main() {
   check('MCP todo_archive 可用', !archiveRes.isError, archiveRes.content?.[0]?.text);
   check('归档后状态为 archived', archiveRes.structuredContent?.status === 'archived', archiveRes.structuredContent?.status);
 
-  /* append=true：detail 追加而不是覆盖，历史内容保留并带时间分隔线；任务同时重开 */
+  /* append=true：detail 追加而不是覆盖，历史内容保留并带时间分隔线；状态不动 */
   const appendRes = await userApi(`/api/v1/tasks/${mcpTaskId}`, {
     method: 'PATCH',
     cookie: userCookie,
     body: JSON.stringify({ detail: '追加的进展说明', append: true }),
   });
   check(
-    'append=true 追加 detail 且保留原文',
+    'append=true 追加 detail 且保留原文，状态不变',
     appendRes.res.status === 200 &&
-      appendRes.body.task.status === 'pending' &&
+      appendRes.body.task.status === 'archived' &&
       appendRes.body.task.detail.includes('任务有了新的进展') &&
       appendRes.body.task.detail.includes('追加的进展说明') &&
       /—— \d{4}-\d{2}-\d{2} \d{2}:\d{2} 更新 ——/.test(appendRes.body.task.detail),
-    JSON.stringify(appendRes.body?.task?.detail)?.slice(0, 160),
+    `status=${appendRes.body?.task?.status} detail=${JSON.stringify(appendRes.body?.task?.detail)?.slice(0, 140)}`,
   );
   const overwriteRes = await userApi(`/api/v1/tasks/${mcpTaskId}`, {
     method: 'PATCH',
@@ -1027,10 +1027,11 @@ async function main() {
     body: JSON.stringify({ detail: '覆盖后的详情' }),
   });
   check(
-    '不带 append 仍然是覆盖语义',
+    '不带 append 仍然是覆盖语义，状态同样不变',
     overwriteRes.res.status === 200 &&
+      overwriteRes.body.task.status === 'archived' &&
       overwriteRes.body.task.detail === '覆盖后的详情',
-    JSON.stringify(overwriteRes.body?.task?.detail)?.slice(0, 120),
+    `status=${overwriteRes.body?.task?.status} detail=${JSON.stringify(overwriteRes.body?.task?.detail)?.slice(0, 120)}`,
   );
 
   const readRes = await client.readResource({ uri: 'todo://tasks' });

@@ -369,15 +369,10 @@ export class TaskService {
 
     if (sets.length === 0) return this.getTask(userId, id);
 
-    // 更新即重开：agent 改已完成/已归档的任务，说明这件事又需要用户看了，
-    // 状态必须跟着回到 pending，否则任务躺在 done 里没人理。
-    // SET 各表达式读的都是更新前的旧行值，所以 case 里直接引用 status 是安全的。
+    // 内容更新（覆盖或追加）一律不动状态：状态只由用户主动操作（回复=完成、接手、归档）。
+    // agent 汇报进展不应把用户已完成/已归档的任务重新拉回待处理列表。
     const res = await this.db.query<Task>(
-      `update tasks set ${sets.join(', ')},
-           status = case when status in ('done', 'archived') then 'pending'::task_status else status end,
-           done_at = case when status in ('done', 'archived') then null else done_at end,
-           acked_at = case when status in ('done', 'archived') then null else acked_at end,
-           updated_at = now()
+      `update tasks set ${sets.join(', ')}, updated_at = now()
        where user_id = $1 and id = $2
        returning *`,
       params,
