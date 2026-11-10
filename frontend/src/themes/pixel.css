@@ -20,9 +20,10 @@
   --dropdown-bg: #f4f2f0;
   --border: rgba(139, 132, 125, 0.35);
   --border-strong: rgba(92, 87, 82, 0.45);
-  --text: rgba(37, 47, 61, 0.96);
-  --text-2: #5c5752;
-  --muted: rgba(92, 87, 82, 0.62);
+  /* 墨色要实：衬线（宋体）笔画细，颜色一虚就看不清，不用透明度 */
+  --text: #222d3b;
+  --text-2: #45403b;
+  --muted: rgba(69, 64, 59, 0.72);
 
   --accent: #4b607c;
   --accent-hover: #3d526b;
@@ -39,7 +40,7 @@
   --info-soft: rgba(75, 96, 124, 0.1);
 
   --toast-bg: #f4f2f0;
-  --toast-fg: rgba(37, 47, 61, 0.96);
+  --toast-fg: #222d3b;
   --code-bg: rgba(37, 47, 61, 0.94);
   --code-fg: #ebe7e4;
 
@@ -75,9 +76,10 @@
     --dropdown-bg: #292623;
     --border: rgba(235, 231, 228, 0.14);
     --border-strong: rgba(235, 231, 228, 0.26);
-    --text: rgba(235, 231, 228, 0.94);
-    --text-2: #b3aca4;
-    --muted: rgba(179, 172, 164, 0.6);
+    /* 暗色工程纸同理：纸白字要实，灰一档就看不清 */
+    --text: #eceae6;
+    --text-2: #cac3ba;
+    --muted: rgba(202, 195, 186, 0.68);
 
     --accent: #8aa3c4;
     --accent-hover: #a3b8d3;
@@ -94,7 +96,7 @@
     --info-soft: rgba(138, 163, 196, 0.14);
 
     --toast-bg: #292623;
-    --toast-fg: rgba(235, 231, 228, 0.94);
+    --toast-fg: #eceae6;
     --code-bg: rgba(0, 0, 0, 0.5);
     --code-fg: #d9d4cd;
 

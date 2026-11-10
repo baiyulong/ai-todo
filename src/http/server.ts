@@ -239,14 +239,40 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       `查看任务：${url}`,
     ].filter((l): l is string => l !== null);
     const text = lines.join('\n');
-    const html = `<div style="font-family:sans-serif;font-size:14px;line-height:1.7">
-  <p style="font-size:15px;font-weight:600;margin:0 0 8px">${escapeHtml(task.title)}</p>
-  <p style="margin:0 0 6px;color:#555">${escapeHtml(opts.headline)} · 级别 ${SEVERITY_LABEL[task.severity]}${task.project ? ` · 项目 ${escapeHtml(task.project)}` : ''}</p>
-  ${task.detail ? `<p style="white-space:pre-wrap;margin:0 0 6px;color:#333">${escapeHtml(task.detail)}</p>` : ''}
-  ${opts.extra ? `<p style="color:#555;margin:0 0 6px">${escapeHtml(opts.extra)}</p>` : ''}
-  <p style="margin:12px 0 0"><a href="${url}">打开 AI Todo 查看任务</a></p>
-</div>`;
+    const html = emailShell(
+      task.title,
+      `<p style="font-size:16px;font-weight:600;margin:0 0 10px;color:#1f2328">${escapeHtml(task.title)}</p>
+  <p style="margin:0 0 10px;color:#57606a">${escapeHtml(opts.headline)} · 级别 ${SEVERITY_LABEL[task.severity]}${task.project ? ` · 项目 ${escapeHtml(task.project)}` : ''}</p>
+  ${task.detail ? `<div style="white-space:pre-wrap;margin:0 0 10px;padding:10px 14px;background:#f6f8fa;border-radius:6px;color:#1f2328">${escapeHtml(task.detail)}</div>` : ''}
+  ${opts.extra ? `<p style="color:#57606a;margin:0 0 10px">${escapeHtml(opts.extra)}</p>` : ''}
+  <p style="margin:14px 0 0"><a href="${url}" style="display:inline-block;padding:8px 16px;background:#1f6feb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">打开 AI Todo 查看任务</a></p>`,
+    );
     return { subject: `[AI Todo] ${task.title}`, text, html };
+  }
+
+  /**
+   * 邮件 HTML 统一外壳。
+   *
+   * 之前各处只发裸片段（没有 <html>/<head>/<meta charset>），部分邮件客户端
+   * 会按纯文本处理或丢样式，中文邮件看起来「没有格式」。
+   * 这里统一包一层完整文档：声明 UTF-8、声明中文字体栈、白卡片版式。
+   * 样式全部内联，不依赖客户端的 <style> 支持。
+   */
+  function emailShell(title: string, bodyHtml: string): string {
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:24px 12px;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Helvetica Neue',Arial,sans-serif;color:#24292f;font-size:14px;line-height:1.7">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e1e4e8;border-radius:8px;padding:24px 28px">
+    ${bodyHtml}
+  </div>
+  <p style="max-width:560px;margin:12px auto 0;font-size:12px;color:#8b949e;text-align:center">此邮件由 AI Todo 自动发送</p>
+</body>
+</html>`;
   }
 
   function escapeHtml(s: string): string {
@@ -762,13 +788,14 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
           '登录后请尽快在「设置 → 修改密码」里改成自己的密码。',
           '如果不是你本人请求重置，请联系管理员。',
         ].join('\n');
-        const html = `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px">
-  <h2 style="margin:0 0 12px">密码已重置</h2>
-  <p style="margin:0 0 8px">你好 <b>${target.username}</b>，管理员重置了你的 AI Todo 登录密码。</p>
-  <p style="margin:12px 0">新密码：<code style="font-size:16px;padding:4px 10px;background:#f2f3f5;border-radius:6px">${password}</code></p>
+        const html = emailShell(
+          '密码已重置',
+          `<h2 style="margin:0 0 12px;font-size:18px;color:#1f2328">密码已重置</h2>
+  <p style="margin:0 0 8px">你好 <b>${escapeHtml(target.username ?? target.email ?? '')}</b>，管理员重置了你的 AI Todo 登录密码。</p>
+  <p style="margin:12px 0">新密码：<code style="font-size:16px;padding:4px 10px;background:#f6f8fa;border-radius:6px">${escapeHtml(password)}</code></p>
   <p style="margin:12px 0 0"><a href="${loginUrl}">打开 AI Todo 登录</a>，登录后请尽快在「设置 → 修改密码」里改成自己的密码。</p>
-  <p style="margin:12px 0 0;color:#888">如果不是你本人请求重置，请联系管理员。</p>
-</div>`;
+  <p style="margin:12px 0 0;color:#8b949e">如果不是你本人请求重置，请联系管理员。</p>`,
+        );
         await mailer.send({
           to: target.email,
           subject: '[AI Todo] 你的密码已被管理员重置',
@@ -1350,7 +1377,13 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       to: body.data.email,
       subject: `[AI Todo] 邮箱绑定验证码：${code}`,
       text: `你的邮箱绑定验证码是 ${code}，15 分钟内有效。如果不是你本人操作，请忽略这封邮件。`,
-      html: `<p>你的邮箱绑定验证码是 <b style="font-size:18px;letter-spacing:2px">${code}</b>，15 分钟内有效。</p><p style="color:#888">如果不是你本人操作，请忽略这封邮件。</p>`,
+      html: emailShell(
+        '邮箱绑定验证码',
+        `<p style="margin:0 0 12px">你的邮箱绑定验证码是：</p>
+  <p style="margin:0 0 12px"><b style="font-size:24px;letter-spacing:4px;color:#1f2328">${code}</b></p>
+  <p style="margin:0 0 8px;color:#57606a">验证码 15 分钟内有效。</p>
+  <p style="margin:0;color:#8b949e">如果不是你本人操作，请忽略这封邮件。</p>`,
+      ),
     });
     return { ok: true };
   });
