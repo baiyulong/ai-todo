@@ -239,13 +239,21 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       `查看任务：${url}`,
     ].filter((l): l is string => l !== null);
     const text = lines.join('\n');
+    const severityColor: Record<TaskSeverity, { bg: string; fg: string; border: string }> = {
+      blocker: { bg: '#ffebe9', fg: '#cf222e', border: '#cf222e' },
+      need_human: { bg: '#fff8c5', fg: '#9a6700', border: '#d4a72c' },
+      info: { bg: '#ddf4ff', fg: '#0969da', border: '#54aeff' },
+    };
+    const sev = severityColor[task.severity];
+    const metaChip = (label: string, value: string, bg: string, fg: string) =>
+      `<span style="display:inline-block;padding:2px 10px;border-radius:999px;background:${bg};color:${fg};font-size:12px;font-weight:600;margin:0 6px 6px 0">${escapeHtml(label)} ${escapeHtml(value)}</span>`;
     const html = emailShell(
       task.title,
-      `<p style="font-size:16px;font-weight:600;margin:0 0 10px;color:#1f2328">${escapeHtml(task.title)}</p>
-  <p style="margin:0 0 10px;color:#57606a">${escapeHtml(opts.headline)} · 级别 ${SEVERITY_LABEL[task.severity]}${task.project ? ` · 项目 ${escapeHtml(task.project)}` : ''}</p>
-  ${task.detail ? `<div style="white-space:pre-wrap;margin:0 0 10px;padding:10px 14px;background:#f6f8fa;border-radius:6px;color:#1f2328">${escapeHtml(task.detail)}</div>` : ''}
-  ${opts.extra ? `<p style="color:#57606a;margin:0 0 10px">${escapeHtml(opts.extra)}</p>` : ''}
-  <p style="margin:14px 0 0"><a href="${url}" style="display:inline-block;padding:8px 16px;background:#1f6feb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">打开 AI Todo 查看任务</a></p>`,
+      `<p style="font-size:18px;font-weight:700;margin:0 0 12px;color:#1f2328;line-height:1.4">${escapeHtml(task.title)}</p>
+  <div style="margin:0 0 14px">${metaChip('事件', opts.headline, '#f6f8fa', '#57606a')}${metaChip('级别', SEVERITY_LABEL[task.severity], sev.bg, sev.fg)}${task.project ? metaChip('项目', task.project, '#f6f8fa', '#57606a') : ''}</div>
+  ${task.detail ? `<div style="margin:0 0 14px;padding:12px 16px;background:#f6f8fa;border-left:3px solid #1f6feb;border-radius:4px"><p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#57606a;letter-spacing:1px">详情</p><div style="font-size:14px;color:#24292f;line-height:1.8;word-break:break-word">${nl2br(task.detail)}</div></div>` : ''}
+  ${opts.extra ? `<div style="margin:0 0 14px;padding:10px 16px;border-left:3px solid #d0d7de;border-radius:4px;color:#57606a">${nl2br(opts.extra)}</div>` : ''}
+  <p style="margin:18px 0 0"><a href="${url}" style="display:inline-block;padding:9px 20px;background:#1f6feb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px">打开 AI Todo 查看任务</a></p>`,
     );
     return { subject: `[AI Todo] ${task.title}`, text, html };
   }
@@ -266,11 +274,11 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)}</title>
 </head>
-<body style="margin:0;padding:24px 12px;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Helvetica Neue',Arial,sans-serif;color:#24292f;font-size:14px;line-height:1.7">
-  <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e1e4e8;border-radius:8px;padding:24px 28px">
+<body style="margin:0;padding:24px 16px;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Helvetica Neue',Arial,sans-serif;color:#24292f;font-size:14px;line-height:1.7">
+  <div style="width:100%;margin:0 auto;background:#ffffff;border:1px solid #e1e4e8;border-radius:8px;padding:28px 32px">
     ${bodyHtml}
   </div>
-  <p style="max-width:560px;margin:12px auto 0;font-size:12px;color:#8b949e;text-align:center">此邮件由 AI Todo 自动发送</p>
+  <p style="margin:12px auto 0;font-size:12px;color:#8b949e;text-align:center">此邮件由 AI Todo 自动发送</p>
 </body>
 </html>`;
   }
@@ -281,6 +289,11 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       .replaceAll('<', '&lt;')
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;');
+  }
+
+  /** 换行转 <br>：部分邮件客户端不认 white-space:pre-wrap，硬换行会全挤成一行 */
+  function nl2br(s: string): string {
+    return escapeHtml(s).replaceAll('\r\n', '\n').replaceAll('\n', '<br>');
   }
 
   /** 给指定用户发任务邮件（没有绑定邮箱就跳过；mailer 内部吞 SMTP 错误） */
@@ -790,11 +803,12 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
         ].join('\n');
         const html = emailShell(
           '密码已重置',
-          `<h2 style="margin:0 0 12px;font-size:18px;color:#1f2328">密码已重置</h2>
-  <p style="margin:0 0 8px">你好 <b>${escapeHtml(target.username ?? target.email ?? '')}</b>，管理员重置了你的 AI Todo 登录密码。</p>
-  <p style="margin:12px 0">新密码：<code style="font-size:16px;padding:4px 10px;background:#f6f8fa;border-radius:6px">${escapeHtml(password)}</code></p>
-  <p style="margin:12px 0 0"><a href="${loginUrl}">打开 AI Todo 登录</a>，登录后请尽快在「设置 → 修改密码」里改成自己的密码。</p>
-  <p style="margin:12px 0 0;color:#8b949e">如果不是你本人请求重置，请联系管理员。</p>`,
+          `<h2 style="margin:0 0 14px;font-size:18px;color:#1f2328">密码已重置</h2>
+  <p style="margin:0 0 14px">你好 <b>${escapeHtml(target.username ?? target.email ?? '')}</b>，管理员重置了你的 AI Todo 登录密码。</p>
+  <div style="margin:0 0 14px;padding:14px 18px;background:#f6f8fa;border-left:3px solid #1f6feb;border-radius:4px"><p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#57606a;letter-spacing:1px">新密码</p><code style="font-size:18px;font-weight:600;color:#1f2328;word-break:break-all">${escapeHtml(password)}</code></div>
+  <p style="margin:0 0 12px"><a href="${loginUrl}" style="display:inline-block;padding:9px 20px;background:#1f6feb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px">打开 AI Todo 登录</a></p>
+  <p style="margin:0 0 10px;color:#57606a">登录后请尽快在「设置 → 修改密码」里改成自己的密码。</p>
+  <p style="margin:0;color:#8b949e">如果不是你本人请求重置，请联系管理员。</p>`,
         );
         await mailer.send({
           to: target.email,
@@ -1379,8 +1393,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       text: `你的邮箱绑定验证码是 ${code}，15 分钟内有效。如果不是你本人操作，请忽略这封邮件。`,
       html: emailShell(
         '邮箱绑定验证码',
-        `<p style="margin:0 0 12px">你的邮箱绑定验证码是：</p>
-  <p style="margin:0 0 12px"><b style="font-size:24px;letter-spacing:4px;color:#1f2328">${code}</b></p>
+        `<p style="margin:0 0 14px">你的邮箱绑定验证码是：</p>
+  <div style="margin:0 0 14px;padding:16px;background:#f6f8fa;border-left:3px solid #1f6feb;border-radius:4px;text-align:center"><b style="font-size:26px;letter-spacing:6px;color:#1f2328;font-family:Menlo,Consolas,monospace">${code}</b></div>
   <p style="margin:0 0 8px;color:#57606a">验证码 15 分钟内有效。</p>
   <p style="margin:0;color:#8b949e">如果不是你本人操作，请忽略这封邮件。</p>`,
       ),
