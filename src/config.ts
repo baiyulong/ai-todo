@@ -103,8 +103,24 @@ export interface Config {
 export function loadConfig(): Config {
   loadDotEnv();
 
-  // 端口：AI_TODO_PORT 优先；云平台（Cloudfoundry/xPaas 等）惯例注入 PORT，作兜底
-  const port = Number(process.env.AI_TODO_PORT ?? process.env.PORT ?? 8787);
+  // 端口：AI_TODO_PORT 优先；云平台（Cloudfoundry/xPaas 等）惯例注入 PORT，作兜底。
+  // 平台可能注入非数字的 PORT（如 K8s 风格 tcp://ip:port），必须严格校验，
+  // 否则 Number() 得到 NaN，Fastify 启动即抛 options.port should be >= 0 and < 65536。
+  const parsePort = (raw: string | undefined): number | undefined => {
+    const v = raw?.trim();
+    if (!v || !/^\d+$/.test(v)) return undefined;
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 0 && n < 65536 ? n : undefined;
+  };
+  const port = parsePort(process.env.AI_TODO_PORT) ?? parsePort(process.env.PORT) ?? 8787;
+  if (
+    port === 8787 &&
+    (process.env.AI_TODO_PORT !== undefined || process.env.PORT !== undefined)
+  ) {
+    console.warn(
+      `[config] AI_TODO_PORT/PORT 不是有效的端口号（AI_TODO_PORT=${JSON.stringify(process.env.AI_TODO_PORT)}，PORT=${JSON.stringify(process.env.PORT)}），已回退到默认端口 8787`,
+    );
+  }
   const host = process.env.AI_TODO_HOST ?? '127.0.0.1';
   const dataDir = resolve(packageRoot, process.env.AI_TODO_DATA_DIR ?? 'data');
   const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
