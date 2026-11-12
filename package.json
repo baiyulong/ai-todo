@@ -23,6 +23,7 @@
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
     "web:dev": "npm run dev --prefix frontend",
     "web:build": "npm run build --prefix frontend",
+    "pack:xpaas": "node scripts/pack-xpaas.mjs",
     "deploy:web": "tcb hosting deploy frontend/dist -e sure-vole-d0gfdy5aj5daeaa3b --verify --ignore index.html"
   },
   "dependencies": {
