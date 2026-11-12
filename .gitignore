@@ -7,6 +7,7 @@ frontend/dist/
 # 部署打包产物
 deploy/xpaas-package/
 deploy/*.zip
+deploy/*.tar.gz
 
 # 运行时数据：PGlite 数据库、管理员凭据、令牌、日志
 data/
