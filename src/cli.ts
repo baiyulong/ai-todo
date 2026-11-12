@@ -152,6 +152,7 @@ async function serve(): Promise<void> {
   console.log('');
   console.log('  AI Todo 已启动');
   console.log('  ─────────────────────────────────────────');
+  console.log(`  监听       ${config.host}:${config.port}${config.host === '0.0.0.0' ? '（全网卡）' : ''}`);
   console.log(`  Web 界面   ${url}`);
   console.log(`  数据库     ${db.driver === 'pg' ? 'PostgreSQL (DATABASE_URL)' : `PGlite (${config.pgliteDir})`}`);
   console.log(`  管理员     ${bootstrap.adminUser.username ?? 'admin'}`);

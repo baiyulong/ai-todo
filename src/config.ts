@@ -121,7 +121,16 @@ export function loadConfig(): Config {
       `[config] AI_TODO_PORT/PORT 不是有效的端口号（AI_TODO_PORT=${JSON.stringify(process.env.AI_TODO_PORT)}，PORT=${JSON.stringify(process.env.PORT)}），已回退到默认端口 8787`,
     );
   }
-  const host = process.env.AI_TODO_HOST ?? '127.0.0.1';
+  // 主机：默认回环（本地开发安全）；在 K8s 容器里（kubelet 会注入 KUBERNETES_SERVICE_HOST）
+  // 自动切换全网卡——探针/路由从 Pod IP 连进来，绑 127.0.0.1 会 connection refused。
+  // 平台用自己的 Dockerfile 模板，镜像 ENV 不可控，必须代码里兜住。
+  const inKubernetes = process.env.KUBERNETES_SERVICE_HOST !== undefined;
+  const host = process.env.AI_TODO_HOST ?? (inKubernetes ? '0.0.0.0' : '127.0.0.1');
+  if (inKubernetes && (host === '127.0.0.1' || host === 'localhost')) {
+    console.warn(
+      `[config] K8s 环境下 AI_TODO_HOST=${JSON.stringify(process.env.AI_TODO_HOST)} 绑定回环地址，探针/外部流量将 connection refused`,
+    );
+  }
   const dataDir = resolve(packageRoot, process.env.AI_TODO_DATA_DIR ?? 'data');
   const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
   const baseUrl = process.env.AI_TODO_BASE_URL ?? `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`;
