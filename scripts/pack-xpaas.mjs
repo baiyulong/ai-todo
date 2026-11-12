@@ -57,16 +57,17 @@ mustCopy(join(root, 'deploy', 'Dockerfile.xpaas'), join(outDir, 'Dockerfile'));
 console.log('4/4 压缩 zip');
 let zipped = false;
 if (process.platform === 'win32') {
-  const r = spawnSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      `Compress-Archive -Path (Join-Path '${outDir.replaceAll("'", "''")}' '*') -DestinationPath '${zipPath}' -Force`,
-    ],
-    { stdio: 'inherit', shell: true },
-  );
-  zipped = r.status === 0;
+  // 不能用 Compress-Archive：Windows PowerShell 5.1 会把 zip 内部路径写成反斜杠（dist\src\cli.js），
+  // Linux 解压出来目录结构全坏。Windows 自带的 bsdtar 按 POSIX 惯例写正斜杠，且 -a 按扩展名输出 zip 格式。
+  const bsdtar = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+  if (existsSync(bsdtar)) {
+    const r = spawnSync(
+      bsdtar,
+      ['-a', '-c', '-f', zipPath, '-C', outDir, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile'],
+      { stdio: 'inherit', shell: false },
+    );
+    zipped = r.status === 0;
+  }
 } else {
   const r = spawnSync('zip', ['-rq', zipPath, '.'], { stdio: 'inherit', cwd: outDir });
   zipped = r.status === 0;
