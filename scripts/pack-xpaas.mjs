@@ -4,7 +4,7 @@
  *
  *   npm run pack:xpaas
  *
- * 产出 deploy/xpaas-package/（可直接上传的目录内容）与 deploy/ai-todo-xpaas.zip。
+ * 产出 deploy/xpaas-package/（可直接上传的目录内容）与 deploy/ai-todo-xpaas.tar.gz。
  * 包内容：package.json、package-lock.json、dist/（后端编译产物）、
  *        frontend/dist/（前端构建产物）、Dockerfile（平台模板改造版）。
  *
@@ -19,7 +19,7 @@ import process from 'node:process';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'deploy', 'xpaas-package');
-const zipPath = join(root, 'deploy', 'ai-todo-xpaas.zip');
+const tarPath = join(root, 'deploy', 'ai-todo-xpaas.tar.gz');
 
 const run = (cmd, args, opts = {}) => {
   console.log(`$ ${cmd} ${args.join(' ')}`);
@@ -32,7 +32,7 @@ const run = (cmd, args, opts = {}) => {
 
 console.log('1/4 清理旧的打包产物');
 rmSync(outDir, { recursive: true, force: true });
-rmSync(zipPath, { force: true });
+rmSync(tarPath, { force: true });
 
 console.log('2/4 构建后端（tsc）与前端（vite build）');
 run('npm', ['run', 'build']);
@@ -54,23 +54,25 @@ mustCopy(join(root, 'dist'), join(outDir, 'dist'));
 mustCopy(join(root, 'frontend', 'dist'), join(outDir, 'frontend', 'dist'));
 mustCopy(join(root, 'deploy', 'Dockerfile.xpaas'), join(outDir, 'Dockerfile'));
 
-console.log('4/4 压缩 zip');
-let zipped = false;
+console.log('4/4 压缩 tar.gz');
+let packed = false;
 if (process.platform === 'win32') {
-  // 不能用 Compress-Archive：Windows PowerShell 5.1 会把 zip 内部路径写成反斜杠（dist\src\cli.js），
-  // Linux 解压出来目录结构全坏。Windows 自带的 bsdtar 按 POSIX 惯例写正斜杠，且 -a 按扩展名输出 zip 格式。
+  // Windows 自带 bsdtar 可写 tar/tar.gz 且路径为 POSIX 正斜杠；Git Bash 的 GNU tar 不行。
   const bsdtar = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
   if (existsSync(bsdtar)) {
     const r = spawnSync(
       bsdtar,
-      ['-a', '-c', '-f', zipPath, '-C', outDir, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile'],
+      ['-czf', tarPath, '-C', outDir, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile'],
       { stdio: 'inherit', shell: false },
     );
-    zipped = r.status === 0;
+    packed = r.status === 0;
   }
 } else {
-  const r = spawnSync('zip', ['-rq', zipPath, '.'], { stdio: 'inherit', cwd: outDir });
-  zipped = r.status === 0;
+  const r = spawnSync('tar', ['-czf', tarPath, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile'], {
+    stdio: 'inherit',
+    cwd: outDir,
+  });
+  packed = r.status === 0;
 }
 
 const sizeOf = (p) => {
@@ -87,8 +89,8 @@ const mb = (n) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 console.log('');
 console.log('打包完成：');
 console.log(`  目录：${outDir}（${mb(sizeOf(outDir))}）`);
-if (zipped) console.log(`  压缩：${zipPath}（${mb(statSync(zipPath).size)}）`);
-else console.log('  压缩：系统没有可用的压缩命令，请手动压缩目录内容');
+if (packed) console.log(`  压缩：${tarPath}（${mb(statSync(tarPath).size)}）`);
+else console.log('  压缩：系统没有可用的打包命令，请手动压缩目录内容');
 console.log('');
 console.log('上传平台前确认：');
 console.log('  - 平台环境变量已配置 DATABASE_URL（外部 Postgres）');

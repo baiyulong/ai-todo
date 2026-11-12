@@ -7,9 +7,9 @@ WORKDIR /data/server/nodejs-app
 # 平台上传的部署包：package.json + package-lock.json + dist/ + frontend/dist/
 ADD ["{{files.package.dest}}", "/data/server/nodejs-app"]
 
-# 兼容平台以压缩包交付的情况：包根下若存在 zip 则先解开（不限文件名）
-# （如果平台是直接落解压后的目录内容，这一步自动跳过）
-RUN for z in *.zip; do [ -f "$z" ] && unzip -qo "$z" && break; done; \
+# 兼容压缩包交付：ADD 对 tar/tar.gz 会自动解包（Docker 原生行为）；
+# 若平台只是原样落文件，则手动解开包根下的 tar 包（alpine busybox tar 支持 gzip）
+RUN for a in *.tar.gz *.tgz *.tar; do [ -f "$a" ] && tar -xzf "$a" && break; done; \
     npm install --omit=dev --registry=https://maven.xpaas.lenovo.com/nexus/repository/npm/
 
 # 运行时配置：数据库等敏感信息由平台环境变量注入（DATABASE_URL 必须）
