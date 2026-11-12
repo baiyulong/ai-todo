@@ -4,13 +4,22 @@
  * 说明：
  * - 使用真实 PostgreSQL 语法，SQLite 不兼容（jsonb、部分索引、枚举类型、ON CONFLICT 推断）。
  * - 默认使用 PGlite（编译为 WASM 的 PostgreSQL）零安装运行；设置 DATABASE_URL 后切换到标准 pg 驱动。
- * - gen_random_uuid() 自 PostgreSQL 13 起为内核函数，无需 pgcrypto 扩展。
+ * - gen_random_uuid() 自 PostgreSQL 13 起为内核函数；老版本库（<13）没有且可能装不了
+ *   pgcrypto 扩展，因此统一用内核表达式自造 v4 UUID（app_uuid()），任何版本都可用。
  * - 配置 A 不建 channels 表：没有外部推送通道，不需要通道订阅与凭据管理。
  *   未来若升级到配置 B（增加邮件 / 群机器人 / Server酱 兜底），加回 channels 表即可，
  *   任务模型与本表其余部分不受影响。
  */
 
 export const SCHEMA_SQL = `
+-- ============ 兼容函数 ============
+-- gen_random_uuid() 只在 PostgreSQL 13+ 内置；老版本且无 pgcrypto 时不可用。
+-- 这里用内核表达式构造标准 v4 UUID：md5 摘要的 hex 第 13 位放版本位 '4'、
+-- 第 17 位放变体位 '8'，::uuid 转型自动插入连字符。输出格式与 gen_random_uuid() 一致。
+create or replace function app_uuid() returns uuid as $$
+  select overlay(overlay(md5(random()::text || clock_timestamp()::text) placing '4' from 13) placing '8' from 17)::uuid
+$$ language sql volatile;
+
 -- ============ 枚举 ============
 -- PostgreSQL 的 CREATE TYPE 不支持 IF NOT EXISTS，用 DO 块 + 异常捕获实现幂等。
 do $$ begin
@@ -25,7 +34,7 @@ exception when duplicate_object then null; end $$;
 
 -- ============ 用户 ============
 create table if not exists users (
-  id           uuid primary key default gen_random_uuid(),
+  id           uuid primary key default app_uuid(),
   email        text unique,
   display_name text,
   created_at   timestamptz not null default now()
@@ -60,7 +69,7 @@ create index if not exists users_wechat_unionid_idx
 
 -- ============ AI 来源：溯源与聚合维度 ============
 create table if not exists ai_sources (
-  id          uuid primary key default gen_random_uuid(),
+  id          uuid primary key default app_uuid(),
   user_id     uuid not null references users(id) on delete cascade,
   agent       text not null,
   session_key text not null,
@@ -71,7 +80,7 @@ create table if not exists ai_sources (
 
 -- ============ 任务 ============
 create table if not exists tasks (
-  id               uuid primary key default gen_random_uuid(),
+  id               uuid primary key default app_uuid(),
   user_id          uuid not null references users(id) on delete cascade,
   title            text not null,
   detail           text,
@@ -111,7 +120,7 @@ create index if not exists events_type_idx on task_events (type, id);
 
 -- ============ 通知记录：浏览器横幅的投递流水 ============
 create table if not exists notifications (
-  id         uuid primary key default gen_random_uuid(),
+  id         uuid primary key default app_uuid(),
   user_id    uuid not null references users(id) on delete cascade,
   task_id    uuid references tasks(id) on delete cascade,
   kind       notif_kind not null default 'task',
@@ -140,7 +149,7 @@ create table if not exists notification_rules (
 
 -- ============ API Token（MCP 与脚本用） ============
 create table if not exists api_tokens (
-  id           uuid primary key default gen_random_uuid(),
+  id           uuid primary key default app_uuid(),
   user_id      uuid not null references users(id) on delete cascade,
   name         text not null,
   token_hash   text not null unique,
@@ -163,7 +172,7 @@ alter table api_tokens add column if not exists token text;
 -- 项目是任务的一等维度：先有项目，令牌绑定项目，任务落在令牌的项目里。
 -- tasks.project 冗余存项目名（展示/筛选/分组直接用），project_id 才是权威关联。
 create table if not exists projects (
-  id         uuid primary key default gen_random_uuid(),
+  id         uuid primary key default app_uuid(),
   user_id    uuid not null references users(id) on delete cascade,
   name       text not null,
   is_default boolean not null default false,
@@ -200,7 +209,7 @@ where a.project_id is null and p.user_id = a.user_id and p.is_default;
 
 -- ============ Web 会话（浏览器登录后签发） ============
 create table if not exists sessions (
-  id           uuid primary key default gen_random_uuid(),
+  id           uuid primary key default app_uuid(),
   user_id      uuid not null references users(id) on delete cascade,
   token_hash   text not null unique,
   created_at   timestamptz not null default now(),
