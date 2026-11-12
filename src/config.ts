@@ -103,7 +103,8 @@ export interface Config {
 export function loadConfig(): Config {
   loadDotEnv();
 
-  const port = Number(process.env.AI_TODO_PORT ?? 8787);
+  // 端口：AI_TODO_PORT 优先；云平台（Cloudfoundry/xPaas 等）惯例注入 PORT，作兜底
+  const port = Number(process.env.AI_TODO_PORT ?? process.env.PORT ?? 8787);
   const host = process.env.AI_TODO_HOST ?? '127.0.0.1';
   const dataDir = resolve(packageRoot, process.env.AI_TODO_DATA_DIR ?? 'data');
   const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
