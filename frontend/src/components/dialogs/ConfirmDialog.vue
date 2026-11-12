@@ -4,12 +4,15 @@
 
 import { useUiStore } from '../../stores/ui.js';
 import { t } from '../../i18n.js';
+import { useModalDialog } from '../../composables/modalDialog.js';
 
 const ui = useUiStore();
+/* showModal() 模态：悬浮居中 + 遮罩；:open 绑定只会排在文档流里 */
+const dlg = useModalDialog(() => !!ui.confirmState);
 </script>
 
 <template>
-  <dialog :open="!!ui.confirmState" class="dialog" @cancel.prevent="ui.resolveConfirm(false)">
+  <dialog ref="dlg" class="dialog" @cancel.prevent="ui.resolveConfirm(false)">
     <div class="dialog-inner">
       <h2>{{ ui.confirmState?.title || t('confirm.title') }}</h2>
       <p class="dialog-note">{{ ui.confirmState?.text }}</p>

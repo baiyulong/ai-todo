@@ -4,9 +4,12 @@
 import { useUiStore } from '../../stores/ui.js';
 import { tokenDialogToken, stopWechatPoll } from '../../wechat.js';
 import { copyText } from '../../composables/clipboard.js';
+import { useModalDialog } from '../../composables/modalDialog.js';
 import { t } from '../../i18n.js';
 
 const ui = useUiStore();
+/* showModal() 模态：悬浮居中 + 遮罩 */
+const dlg = useModalDialog(() => !!tokenDialogToken.value);
 
 function close() {
   tokenDialogToken.value = '';
@@ -19,7 +22,7 @@ async function copy() {
 </script>
 
 <template>
-  <dialog :open="!!tokenDialogToken" class="dialog" @cancel.prevent="close">
+  <dialog ref="dlg" class="dialog" @cancel.prevent="close">
     <div class="dialog-inner">
       <h2>{{ t('wechat.tokenTitle') }}</h2>
       <p class="dialog-note">{{ t('wechat.tokenHint') }}</p>
