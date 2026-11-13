@@ -1535,6 +1535,17 @@ export async function ensureBootstrapCredentials(
 
   const { user, created, password } = await users.ensureBootstrapAdmin();
 
+  // 运维逃生通道：环境变量强制重置管理员密码（管理员密码丢失/凭据文件对不上时用）。
+  // 用法：平台环境变量设置 AI_TODO_ADMIN_PASSWORD=<至少 8 位>，重启后用 admin + 该密码登录，
+  // 登录成功后务必移除该环境变量。每次重启只要该变量存在就会重置。
+  const envPassword = process.env.AI_TODO_ADMIN_PASSWORD?.trim() || null;
+  let effectivePassword = password;
+  if (envPassword) {
+    await users.setPassword(user.id, envPassword);
+    effectivePassword = envPassword;
+    console.log('[bootstrap] 已用 AI_TODO_ADMIN_PASSWORD 重置管理员密码，请立即登录并移除该环境变量');
+  }
+
   // 已有凭据文件且令牌仍然有效 → 原样复用，不覆盖已保存的密码
   let existingToken: string | null = null;
   let existingPassword: string | null = null;
@@ -1601,7 +1612,9 @@ export async function ensureBootstrapCredentials(
     `# AI Todo 管理员凭据（明文只保留在这里，数据库仅存哈希）`,
     `username=${user.username}`,
   ];
-  if (password ?? existingPassword) lines.push(`password=${password ?? existingPassword}`);
+  if (effectivePassword ?? existingPassword) {
+    lines.push(`password=${effectivePassword ?? existingPassword}`);
+  }
   lines.push(`token=${adminToken}`);
   writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
 
@@ -1609,7 +1622,7 @@ export async function ensureBootstrapCredentials(
     adminUser: { id: user.id, username: user.username },
     adminToken,
     created,
-    password: password ?? existingPassword,
+    password: effectivePassword ?? existingPassword,
   };
 }
 
