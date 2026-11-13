@@ -53,6 +53,8 @@ mustCopy(join(root, 'package-lock.json'), join(outDir, 'package-lock.json'));
 mustCopy(join(root, 'dist'), join(outDir, 'dist'));
 mustCopy(join(root, 'frontend', 'dist'), join(outDir, 'frontend', 'dist'));
 mustCopy(join(root, 'deploy', 'Dockerfile.xpaas'), join(outDir, 'Dockerfile'));
+mkdirSync(join(outDir, 'scripts'), { recursive: true });
+mustCopy(join(root, 'scripts', 'smtp-test.mjs'), join(outDir, 'scripts', 'smtp-test.mjs'));
 
 console.log('4/4 压缩 tar.gz');
 let packed = false;
@@ -62,13 +64,13 @@ if (process.platform === 'win32') {
   if (existsSync(bsdtar)) {
     const r = spawnSync(
       bsdtar,
-      ['-czf', tarPath, '-C', outDir, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile'],
+      ['-czf', tarPath, '-C', outDir, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile', 'scripts'],
       { stdio: 'inherit', shell: false },
     );
     packed = r.status === 0;
   }
 } else {
-  const r = spawnSync('tar', ['-czf', tarPath, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile'], {
+  const r = spawnSync('tar', ['-czf', tarPath, 'package.json', 'package-lock.json', 'dist', 'frontend', 'Dockerfile', 'scripts'], {
     stdio: 'inherit',
     cwd: outDir,
   });
