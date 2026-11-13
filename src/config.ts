@@ -71,6 +71,11 @@ export interface MailConfig {
   port: number;
   /** 465 为 true（隐式 TLS），587 等为 false（STARTTLS） */
   secure: boolean;
+  /**
+   * 是否走 SMTP 认证（AUTH PLAIN/LOGIN）。
+   * 内网免认证中继必须为 false——多发 AUTH 命令会被服务器 535 拒收。
+   */
+  auth: boolean;
   user: string;
   /** 认证凭据：授权码（QQ/163 等云邮箱）或密码，走 nodemailer 的 auth.pass */
   pass: string;
@@ -156,16 +161,27 @@ export function loadConfig(): Config {
   const mailPort = Number(process.env.AI_TODO_SMTP_PORT ?? 465);
   // 显式 on/off 优先；空 / 未设时按端口推断（465 隐式 TLS，其余明文 + STARTTLS）
   const mailSecure = process.env.AI_TODO_SMTP_SECURE?.trim() || '';
+  const mailUser = process.env.AI_TODO_SMTP_USER?.trim() || '';
+  // 凭据二选一：AI_TODO_SMTP_AUTH_CODE（授权码，推荐）优先于 AI_TODO_SMTP_PASS。
+  // QQ / 163 / Gmail 等云邮箱要求用「授权码」而非登录密码，值里可能含空格，
+  // 统一去掉首尾空白（授权码中间的空格不受影响）。
+  const mailPass = (process.env.AI_TODO_SMTP_AUTH_CODE ?? process.env.AI_TODO_SMTP_PASS ?? '').trim();
+  // 认证开关：AI_TODO_SMTP_AUTH 显式 on/off 优先；未设时自动推断——
+  // user + pass 都配了才走 AUTH；只配 user（或都不配）视为免认证。
+  // 内网 SMTP 中继（如 smtpinternal.lenovo.com:25）通常免认证，
+  // 旧行为只要配了 user 就强制 AUTH PLAIN，服务器直接 535 拒收。
+  const mailAuthRaw = process.env.AI_TODO_SMTP_AUTH?.trim().toLowerCase() || '';
+  const mailAuth = mailAuthRaw
+    ? ['on', 'true', '1', 'yes'].includes(mailAuthRaw)
+    : Boolean(mailUser && mailPass);
   const mail: MailConfig = {
     enabled: mailHost !== '',
     host: mailHost,
     port: mailPort,
     secure: (mailSecure || (mailPort === 465 ? 'on' : 'off')).toLowerCase() === 'on',
-    user: process.env.AI_TODO_SMTP_USER?.trim() || '',
-    // 凭据二选一：AI_TODO_SMTP_AUTH_CODE（授权码，推荐）优先于 AI_TODO_SMTP_PASS。
-    // QQ / 163 / Gmail 等云邮箱要求用「授权码」而非登录密码，值里可能含空格，
-    // 统一去掉首尾空白（授权码中间的空格不受影响）。
-    pass: (process.env.AI_TODO_SMTP_AUTH_CODE ?? process.env.AI_TODO_SMTP_PASS ?? '').trim(),
+    auth: mailAuth,
+    user: mailUser,
+    pass: mailPass,
     // 发件人规整：支持三种写法，且都不怕手滑带引号 / 全角尖括号（中文输入法）：
     //   1. 「显示名 <addr>」→ 显示名 + 地址
     //   2. 「addr」        → 纯地址

@@ -161,6 +161,11 @@ async function serve(): Promise<void> {
     console.log(
       `  发件人     ${from.name ? `${from.name} <${from.address}>` : from.address}`,
     );
+    console.log(
+      `  SMTP       ${config.mail.host}:${config.mail.port} 认证${
+        config.mail.auth ? `开（${config.mail.user}）` : '关（免认证）'
+      }`,
+    );
   } else {
     console.log('  发件人     （SMTP 未配置，邮件通知已降级为日志模式）');
   }

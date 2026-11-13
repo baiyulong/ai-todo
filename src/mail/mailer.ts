@@ -44,12 +44,17 @@ export function createMailer(config: MailConfig): Mailer {
     host: config.host,
     port: config.port,
     secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.pass } : undefined,
+    // 认证由 config.auth 控制：免认证中继（内网 25 端口）多发 AUTH 会被 535 拒收
+    auth: config.auth && config.user ? { user: config.user, pass: config.pass } : undefined,
     // 发信失败别把进程拖死：连接池超时兜底
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
   });
+  console.log(
+    `[mail] SMTP 已启用 host=${config.host} port=${config.port} ` +
+      `secure=${config.secure} auth=${config.auth ? `on(${config.user})` : 'off（免认证）'}`,
+  );
 
   return {
     enabled: true,
