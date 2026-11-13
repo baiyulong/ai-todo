@@ -41,6 +41,7 @@ export const dict = {
   'topbar.settings': '设置',
   'topbar.language': '切换语言',
   'topbar.languageName': '中文',
+  'topbar.help': '使用文档',
 
   // ---------------- 通知权限横幅 ----------------
   'banner.enable': '开启桌面通知，AI 完成任务时立刻弹横幅提醒。',
@@ -367,4 +368,62 @@ export const dict = {
   'error.wechat_already_bound': '这个微信已经绑定到别的账号了',
   'error.wechat_account_disabled': '这个账号已被禁用',
   'error.wechat_login_failed': '微信登录失败，请重试',
+
+  // ---------------- 帮助文档（Markdown，问号图标打开） ----------------
+  'help.title': '使用文档',
+  'help.close': '关闭',
+  'help.doc': `## 快速上手
+- 登录后即可看到任务列表，右上角数字是待处理数量
+- 状态流转：**待处理 → 已确认 → 已完成 → 归档**
+- 快捷键：j/k 上下选择、a 确认、d 完成、/ 聚焦搜索、Esc 返回列表
+
+## 用 AI 推任务（MCP）
+把下面的配置加进 AI 客户端的 MCP 设置：
+
+### 方式一：远程 HTTP（推荐，客户端无需安装）
+\`\`\`json
+{
+  "mcpServers": {
+    "ai-todo": {
+      "url": "https://<你的服务地址>/mcp",
+      "headers": { "Authorization": "Bearer <访问令牌>" }
+    }
+  }
+}
+\`\`\`
+
+### 方式二：本机 stdio（客户端与服务在同一台机器）
+\`\`\`json
+{
+  "mcpServers": {
+    "ai-todo": {
+      "command": "node",
+      "args": ["<应用目录>/dist/src/cli.js", "mcp"],
+      "env": {
+        "AI_TODO_BASE_URL": "<服务地址>",
+        "AI_TODO_TOKEN": "<访问令牌>"
+      }
+    }
+  }
+}
+\`\`\`
+
+- 访问令牌：右上角头像 → **令牌** 页面自助签发
+- 常用工具：todo_create 建任务 / todo_list 查任务 / todo_update 更新进度
+- 任务级别：**阻塞**（红）、**需人工**（黄）、**通知**（蓝）
+- AI 更新任务只会追加进度说明，不会改变状态；状态由你确认或完成来流转
+
+## 通知
+- 页面内横幅、提示音与桌面通知（设置里可调整）
+- 邮件通知：管理员配置 SMTP 后，任务自动发送到账号绑定的邮箱
+- 微信扫码登录：绑定后扫码即可进入，首次登录自动建号
+
+## 右上角状态点
+- **实时**：SSE 推送正常，任务即时刷新
+- **连接中 / 未登录**：实时流不可用（多为内网网关限制），自动降级为 30 秒轮询，数据照常更新
+
+## 常见问题
+- MCP 报 unable to get local issuer certificate：内网证书不受 Node 信任。在客户端机器设置环境变量 NODE_EXTRA_CA_CERTS=<内网CA证书.pem> 后重启客户端（临时调试可设 NODE_TLS_REJECT_UNAUTHORIZED=0）
+- 收不到邮件：先看垃圾箱；确认账号已绑定邮箱；再找管理员核对 SMTP 配置
+- 项目与令牌管理：右上角头像菜单；用户管理仅管理员可见`,
 };

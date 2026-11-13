@@ -72,6 +72,11 @@ async function logout() {
         <i></i><span>{{ liveText }}</span>
       </span>
 
+      <!-- 帮助文档：点开可看使用说明 -->
+      <button class="icon-btn" type="button" :title="t('topbar.help')" @click="ui.openHelp()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+      </button>
+
       <button class="icon-btn" type="button" :title="t('topbar.language')" @click="toggleLocale">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6" /><path d="m4 14 6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h1" /><path d="m22 22-5-10-5 10" /><path d="M14 18h6" /></svg>
       </button>

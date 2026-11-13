@@ -29,6 +29,7 @@ import TaskFormDrawer from './components/dialogs/TaskFormDrawer.vue';
 import ConfirmDialog from './components/dialogs/ConfirmDialog.vue';
 import WechatBindDialog from './components/dialogs/WechatBindDialog.vue';
 import TokenDialog from './components/dialogs/TokenDialog.vue';
+import HelpDialog from './components/dialogs/HelpDialog.vue';
 
 const ui = useUiStore();
 const session = useSessionStore();
@@ -223,5 +224,6 @@ onUnmounted(() => {
   <ConfirmDialog />
   <WechatBindDialog />
   <TokenDialog />
+  <HelpDialog />
   <ToastCenter />
 </template>

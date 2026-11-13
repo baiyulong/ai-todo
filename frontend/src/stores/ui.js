@@ -52,6 +52,15 @@ export const useUiStore = defineStore('ui', () => {
     taskDialogOpen.value = false;
   }
 
+  /* ---------------- 帮助文档对话框 ---------------- */
+  const helpOpen = ref(false);
+  function openHelp() {
+    helpOpen.value = true;
+  }
+  function closeHelp() {
+    helpOpen.value = false;
+  }
+
   /* ---------------- 抽屉：rules / settings / null ---------------- */
   const drawerMode = ref(null);
 
@@ -121,6 +130,9 @@ export const useUiStore = defineStore('ui', () => {
     taskDialogOpen,
     openTaskDialog,
     closeTaskDialog,
+    helpOpen,
+    openHelp,
+    closeHelp,
     view,
     setView,
     theme,

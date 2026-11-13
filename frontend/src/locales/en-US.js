@@ -41,6 +41,7 @@ export const dict = {
   'topbar.settings': 'Settings',
   'topbar.language': 'Switch language',
   'topbar.languageName': 'English',
+  'topbar.help': 'User guide',
 
   // ---------------- Notification permission banner ----------------
   'banner.enable': 'Turn on desktop notifications so AI can pop a banner the moment it finishes a task.',
@@ -367,4 +368,62 @@ export const dict = {
   'error.wechat_already_bound': 'This WeChat account is already linked to another account',
   'error.wechat_account_disabled': 'This account has been disabled',
   'error.wechat_login_failed': 'WeChat sign-in failed, please try again',
+
+  // ---------------- Help document (Markdown, opened from the "?" icon) ----------------
+  'help.title': 'User Guide',
+  'help.close': 'Close',
+  'help.doc': `## Getting started
+- Sign in to see your task list; the number in the top bar is your pending count
+- Status flow: **Pending → Acknowledged → Done → Archived**
+- Shortcuts: j/k select, a acknowledge, d done, / focus search, Esc back to list
+
+## Push tasks with AI (MCP)
+Add one of the following to your AI client's MCP settings:
+
+### Option 1: remote HTTP (recommended, nothing to install)
+\`\`\`json
+{
+  "mcpServers": {
+    "ai-todo": {
+      "url": "https://<your-server>/mcp",
+      "headers": { "Authorization": "Bearer <access-token>" }
+    }
+  }
+}
+\`\`\`
+
+### Option 2: local stdio (client on the same machine as the service)
+\`\`\`json
+{
+  "mcpServers": {
+    "ai-todo": {
+      "command": "node",
+      "args": ["<app-dir>/dist/src/cli.js", "mcp"],
+      "env": {
+        "AI_TODO_BASE_URL": "<server-url>",
+        "AI_TODO_TOKEN": "<access-token>"
+      }
+    }
+  }
+}
+\`\`\`
+
+- Access token: top-right avatar → **Tokens** page, self-service
+- Tools: todo_create to add / todo_list to query / todo_update to append progress
+- Severities: **Blocker** (red), **Needs human** (yellow), **Notice** (blue)
+- AI updates only append progress notes and never change the status; the status is yours to advance
+
+## Notifications
+- In-page banners, sounds and desktop notifications (adjustable in Settings)
+- Email: once the admin configures SMTP, tasks are mailed to the address bound to your account
+- WeChat sign-in: bind once, then just scan to sign in; accounts are created on first scan
+
+## Top-bar status dot
+- **Live**: SSE push is working; tasks refresh instantly
+- **Connecting / Signed out**: the realtime stream is unavailable (often a corporate gateway); the app falls back to 30s polling so data still updates
+
+## FAQ
+- MCP error "unable to get local issuer certificate": the corporate certificate is not trusted by Node. Set NODE_EXTRA_CA_CERTS=<corp-ca.pem> on the client machine and restart (for quick debugging only, NODE_TLS_REJECT_UNAUTHORIZED=0 also works)
+- No email arriving: check spam first; confirm the account has an email bound; then ask the admin to verify the SMTP settings
+- Projects and tokens: top-right avatar menu; user management is admin-only`,
 };
