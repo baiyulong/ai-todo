@@ -156,6 +156,14 @@ async function serve(): Promise<void> {
   console.log(`  监听       ${config.host}:${config.port}${config.host === '0.0.0.0' ? '（全网卡）' : ''}`);
   console.log(`  Web 界面   ${url}`);
   console.log(`  数据库     ${db.driver === 'pg' ? 'PostgreSQL (DATABASE_URL)' : `PGlite (${config.pgliteDir})`}`);
+  if (config.mail.enabled) {
+    const from = config.mail.from;
+    console.log(
+      `  发件人     ${from.name ? `${from.name} <${from.address}>` : from.address}`,
+    );
+  } else {
+    console.log('  发件人     （SMTP 未配置，邮件通知已降级为日志模式）');
+  }
   console.log(`  管理员     ${bootstrap.adminUser.username ?? 'admin'}`);
   console.log(`  凭据文件   ${join(config.dataDir, 'admin-credentials.txt')}`);
   console.log('');

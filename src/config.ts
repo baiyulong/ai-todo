@@ -166,22 +166,34 @@ export function loadConfig(): Config {
     // QQ / 163 / Gmail 等云邮箱要求用「授权码」而非登录密码，值里可能含空格，
     // 统一去掉首尾空白（授权码中间的空格不受影响）。
     pass: (process.env.AI_TODO_SMTP_AUTH_CODE ?? process.env.AI_TODO_SMTP_PASS ?? '').trim(),
-    // 发件人规整：FROM 里可能写「显示名 <地址>」、纯地址，也可能手滑带中文引号。
-    // 一律拆出地址；地址不合法则回落 SMTP_USER，还不行才用 no-reply@localhost。
-    // QQ SMTP 要求 MAIL FROM 必须是认证账号本身，所以回落顺序不能反。
+    // 发件人规整：支持三种写法，且都不怕手滑带引号 / 全角尖括号（中文输入法）：
+    //   1. 「显示名 <addr>」→ 显示名 + 地址
+    //   2. 「addr」        → 纯地址
+    //   3. 「显示名」      → 显示名照用，地址回落到 SMTP_USER
+    // 旧行为在第 3 种会把显示名整个丢掉（name=''），邮件客户端就只能显示邮箱地址，
+    // 表现为「AI_TODO_SMTP_FROM 不生效」。
+    // 地址不合法一律回落 SMTP_USER（QQ SMTP 要求 MAIL FROM 必须是认证账号本身）。
     from: (() => {
       const smtpUser = process.env.AI_TODO_SMTP_USER?.trim() || '';
-      const fromRaw = process.env.AI_TODO_SMTP_FROM?.trim() || '';
-      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test.bind(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
-      const m = fromRaw.match(/<([^<>]*)>/);
-      const addr = (m ? m[1] : fromRaw).trim().replace(/^["'\u201c\u201d]+|["'\u201c\u201d]+$/g, '');
-      const name = m
-        ? fromRaw.slice(0, m.index).trim().replace(/^["'\u201c\u201d]+|["'\u201c\u201d]+$/g, '')
-        : '';
-      return {
-        name,
-        address: isEmail(addr) ? addr : isEmail(smtpUser) ? smtpUser : 'no-reply@localhost',
-      };
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const fallbackAddr = isEmail.test(smtpUser) ? smtpUser : 'no-reply@localhost';
+      const strip = (s: string) =>
+        s.trim().replace(/^["'\u201c\u201d]+|["'\u201c\u201d]+$/g, '');
+
+      // 整串先剥一层引号，再把全角尖括号归一成半角（中文输入法常见手误）
+      const raw = strip(process.env.AI_TODO_SMTP_FROM ?? '').replace(/＜|＞|《|》/g, (ch) =>
+        ch === '＜' || ch === '《' ? '<' : '>',
+      );
+
+      const m = raw.match(/^(.*?)<([^<>]+)>\s*$/);
+      if (m) {
+        return { name: strip(m[1]), address: isEmail.test(strip(m[2])) ? strip(m[2]) : fallbackAddr };
+      }
+      if (isEmail.test(raw)) {
+        return { name: '', address: raw };
+      }
+      // 只填了显示名：名字保留，地址回落
+      return { name: raw, address: fallbackAddr };
     })(),
   };
 
