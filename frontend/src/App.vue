@@ -37,17 +37,60 @@ const tasks = useTasksStore();
 /* ---------------- SSE 实时流 ---------------- */
 
 let es = null;
+let esWatchdog = null;
+let esRetryTimer = null;
+let pollTimer = null;
+
+/**
+ * 轮询兜底：SSE 被平台网关缓冲/拦截时（onopen/onerror 都不触发，状态永远停在
+ * 「连接中」），改用定时拉取保证数据仍然新鲜；SSE 握上后自动停掉。
+ */
+function startPolling(on) {
+  if (on && !pollTimer) {
+    pollTimer = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        await tasks.loadTasks();
+        await session.loadMe();
+      } catch { /* 下轮再试 */ }
+    }, 30_000);
+  } else if (!on && pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
 
 function connectStream() {
   if (es) es.close();
+  clearTimeout(esRetryTimer);
+  ui.setLive('connecting');
   es = new EventSource('/api/v1/stream', { withCredentials: true });
-  es.onopen = () => ui.setLive('live');
-  es.onerror = () => ui.setLive('down');
+  es.onopen = () => {
+    clearTimeout(esWatchdog);
+    ui.setLive('live');
+    startPolling(false);
+  };
+  es.onerror = () => {
+    clearTimeout(esWatchdog);
+    ui.setLive('down');
+    startPolling(true);
+  };
   es.addEventListener('notification', (e) => {
     try {
       onNotification(JSON.parse(e.data));
     } catch { /* 忽略坏包 */ }
   });
+
+  // 看门狗：EventSource 停在 CONNECTING 时既不触发 onopen 也不触发 onerror
+  // （网关握着连接不吐响应头）。8 秒没握上就判死：标记断开、开轮询、稍后重试建流。
+  esWatchdog = setTimeout(() => {
+    if (ui.live === 'live') return;
+    es?.close();
+    es = null;
+    ui.setLive('down');
+    startPolling(true);
+    esRetryTimer = setTimeout(connectStream, 30_000);
+  }, 8_000);
 }
 
 async function onNotification(payload) {
@@ -141,6 +184,9 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown);
   stopHackerFx();
   stopPaperFx();
+  clearTimeout(esWatchdog);
+  clearTimeout(esRetryTimer);
+  if (pollTimer) clearInterval(pollTimer);
   if (es) es.close();
 });
 </script>

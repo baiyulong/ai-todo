@@ -1465,6 +1465,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     const ctx = currentAuth(req);
 
     reply.hijack();
+    // 关掉 Nagle：SSE 的心跳/事件都是小包，网关路径上别让内核再攒一把
+    req.raw.socket?.setNoDelay(true);
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
