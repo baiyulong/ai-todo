@@ -1535,18 +1535,7 @@ export async function ensureBootstrapCredentials(
 
   const { user, created, password } = await users.ensureBootstrapAdmin();
 
-  // 运维逃生通道：环境变量强制重置管理员密码（管理员密码丢失/凭据文件对不上时用）。
-  // 用法：平台环境变量设置 AI_TODO_ADMIN_PASSWORD=<至少 8 位>，重启后用 admin + 该密码登录，
-  // 登录成功后务必移除该环境变量。每次重启只要该变量存在就会重置。
-  const envPassword = process.env.AI_TODO_ADMIN_PASSWORD?.trim() || null;
-  let effectivePassword = password;
-  if (envPassword) {
-    await users.setPassword(user.id, envPassword);
-    effectivePassword = envPassword;
-    console.log('[bootstrap] 已用 AI_TODO_ADMIN_PASSWORD 重置管理员密码，请立即登录并移除该环境变量');
-  }
-
-  // 已有凭据文件且令牌仍然有效 → 原样复用，不覆盖已保存的密码
+  // 先读已有凭据文件：里面可能还留着上次写入的明文密码
   let existingToken: string | null = null;
   let existingPassword: string | null = null;
   try {
@@ -1558,10 +1547,48 @@ export async function ensureBootstrapCredentials(
       const key = line.slice(0, eq).trim();
       const value = line.slice(eq + 1).trim();
       if (key === 'token') existingToken = value;
-      if (key === 'password') existingPassword = value;
+      if (key === 'password') existingPassword = value || null;
     }
   } catch {
     /* 文件不存在则新建 */
+  }
+
+  // 运维逃生通道：环境变量强制重置管理员密码（管理员密码丢失/凭据文件对不上时用）。
+  // 用法：平台环境变量设置 AI_TODO_ADMIN_PASSWORD=<至少 8 位>，重启后用 admin + 该密码登录，
+  // 登录成功后务必移除该环境变量。每次重启只要该变量存在就会重置。
+  // 兼容平台把值带上引号注入的情况（"xxx" / 'xxx'）。
+  const envRaw = process.env.AI_TODO_ADMIN_PASSWORD?.trim() ?? '';
+  const envPassword = envRaw.replace(/^["']+|["']+$/g, '') || null;
+  let effectivePassword = password ?? existingPassword;
+  if (envPassword) {
+    // 重置目标明确取 admin：库里第一个有用户名的账号不一定是 admin
+    const target = (await users.findByUsername('admin')) ?? user;
+    try {
+      await users.setPassword(target.id, envPassword);
+      effectivePassword = envPassword;
+      console.log(
+        `[bootstrap] 已用环境变量 AI_TODO_ADMIN_PASSWORD 重置管理员 ${target.username} 的密码，请立即登录并移除该环境变量`,
+      );
+    } catch (err) {
+      console.error(
+        `[bootstrap] AI_TODO_ADMIN_PASSWORD 重置失败：${err instanceof Error ? err.message : err}（要求至少 8 位）`,
+      );
+    }
+  } else if (!password && !existingPassword) {
+    // 库里有管理员，但明文已丢失（凭据文件缺失/数据目录被清）→ 重新生成一份并落盘，
+    // 保证凭据文件里的密码永远与数据库一致、可直接登录。
+    const fresh = generatePassword(20);
+    try {
+      await users.setPassword(user.id, fresh);
+      effectivePassword = fresh;
+      console.log(
+        `[bootstrap] 未找到可用密码且凭据文件缺失，已重新生成管理员 ${user.username} 的密码并写入凭据文件`,
+      );
+    } catch (err) {
+      console.error(
+        `[bootstrap] 管理员密码重新生成失败：${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   let adminToken = existingToken;

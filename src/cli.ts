@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig, packageRoot, type Config } from './config.js';
 import { openDb } from './db/index.js';
@@ -28,6 +28,7 @@ const USAGE = `AI Todo
   ai-todo mcp        以 stdio 方式运行 MCP Server（供 AI 客户端拉起）
   ai-todo user       用户管理：add / list / passwd / token
   ai-todo token      签发一个新的访问令牌
+  ai-todo reset-admin 直接改库重置管理员密码（容器内逃生用，不依赖令牌/HTTP）
   ai-todo migrate    仅执行数据库迁移
   ai-todo cloud      CloudBase 云端同步：push / pull / status
 
@@ -416,6 +417,78 @@ async function mintToken(): Promise<void> {
   printMcpConfig(base, payload.token);
 }
 
+/* ------------------------------------------------- reset-admin（改库逃生） */
+
+/**
+ * 绕过 HTTP 与访问令牌，直接在数据库里重置账号密码。
+ * 用途：管理员密码彻底丢失且环境变量通道也没生效时的最后手段，
+ * 进容器执行：
+ *   node dist/src/cli.js reset-admin --password=<至少 8 位>
+ */
+async function resetAdminCommand(): Promise<void> {
+  const config = loadConfig();
+  const username = (argValue('username') ?? 'admin').trim().toLowerCase();
+  const password = argValue('password') ?? generatePassword(20);
+  if (password.length < 8) {
+    console.error('密码至少 8 位。用法：reset-admin --username=admin --password=xxxxxxxx');
+    process.exit(1);
+  }
+
+  const db = await openDb(config);
+  try {
+    await migrate(db);
+    const users = new UserService(db);
+    let target = await users.findByUsername(username);
+    if (!target) {
+      // 兜底：指定用户名不存在时，取库里最早的一个有用户名的账号
+      const res = await db.query<{ id: string }>(
+        `select id from users where username is not null order by created_at limit 1`,
+      );
+      if (res.rows[0]) target = await users.findById(res.rows[0].id);
+    }
+    if (!target) {
+      console.error('数据库里还没有任何账号。请先正常启动一次服务以创建管理员，再执行本命令。');
+      process.exit(1);
+    }
+
+    await users.setPassword(target.id, password);
+
+    // 同步更新凭据文件，保证 data/admin-credentials.txt 里的密码始终可用
+    try {
+      const credFile = join(config.dataDir, 'admin-credentials.txt');
+      let lines: string[] = [];
+      if (existsSync(credFile)) {
+        lines = readFileSync(credFile, 'utf8').split(/\r?\n/).filter(Boolean);
+      }
+      const kept = lines.filter(
+        (l) => !l.startsWith('#') && !l.startsWith('password=') && !l.startsWith('username='),
+      );
+      const header = lines.filter((l) => l.startsWith('#'));
+      const body = [
+        ...header,
+        `username=${target.username}`,
+        `password=${password}`,
+        ...kept,
+      ];
+      mkdirSync(config.dataDir, { recursive: true });
+      writeFileSync(credFile, `${body.join('\n')}\n`, 'utf8');
+    } catch (err) {
+      console.error(`凭据文件更新失败（不影响密码本身）：${err instanceof Error ? err.message : err}`);
+    }
+
+    console.log('');
+    console.log('  密码已直接写入数据库（不经过 HTTP 与访问令牌）');
+    console.log('  ─────────────────────────────────────────');
+    console.log(`  账号     ${target.username}`);
+    console.log(`  新密码   ${password}`);
+    console.log('');
+    console.log('  请立即用该密码登录，并在「设置」中改成自己的密码。');
+    console.log('');
+  } finally {
+    await db.close();
+  }
+}
+
 /* ---------------------------------------------------------------- cloud */
 
 async function cloudCommand(): Promise<void> {
@@ -509,6 +582,8 @@ async function main(): Promise<void> {
       return userCommand();
     case 'token':
       return mintToken();
+    case 'reset-admin':
+      return resetAdminCommand();
     case 'migrate':
       return migrateOnly();
     case 'cloud':
